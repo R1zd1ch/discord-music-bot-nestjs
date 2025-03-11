@@ -1,0 +1,94 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        String     @id @default(uuid())
+  discordId String     @unique
+  playlists Playlist[]
+}
+
+model Playlist {
+  id     String          @id @default(uuid())
+  name   String
+  userId String?
+  user   User?           @relation(fields: [userId], references: [id])
+  tracks PlaylistTrack[]
+
+  createdAt DateTime    @default(now())
+  updatedAt DateTime    @updatedAt()
+  inQueue   QueueItem[]
+}
+
+model PlaylistTrack {
+  id         String   @id @default(uuid())
+  playlistId String
+  playlist   Playlist @relation(fields: [playlistId], references: [id], onDelete: Cascade)
+  track      Track    @relation(fields: [trackId], references: [id])
+  trackId    String
+
+  createdAt DateTime @default(now())
+}
+
+model Track {
+  id       String  @id @default(uuid())
+  trackId  String  @unique
+  title    String
+  artist   String
+  duration String
+  url      String?
+  coverUrl String?
+
+  createdAt       DateTime        @default(now())
+  linkedPlaylists PlaylistTrack[]
+  inQueue         QueueItem[]
+}
+
+model Queue {
+  id      String      @id @default(uuid())
+  guildId String      @unique
+  items   QueueItem[]
+
+  loopMode   LoopMode @default(NONE)
+  isShuffled Boolean  @default(false)
+}
+
+enum LoopMode {
+  NONE
+  TRACK
+  PLAYLIST
+  QUEUE
+}
+
+enum QueueItemType {
+  TRACK
+  PLAYLIST
+}
+
+model QueueItem {
+  id      String @id @default(uuid())
+  queue   Queue  @relation(fields: [queueId], references: [id], onDelete: Cascade)
+  queueId String
+
+  type    QueueItemType //Track or Playlist
+  track   Track?        @relation(fields: [trackId], references: [id])
+  trackId String?
+
+  playlist     Playlist? @relation(fields: [playlistId], references: [id])
+  playlistId   String?
+  position     Int
+  currentIndex Int       @default(0)
+
+  addedAt DateTime @default(now())
+}
