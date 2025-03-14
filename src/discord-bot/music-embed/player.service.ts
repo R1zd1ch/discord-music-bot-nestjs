@@ -81,7 +81,7 @@ export class PlayerService {
     if (nextTrack) {
       embed.addFields(
         { name: '\u200B', value: '\u200B' }, // Разделитель
-        { name: '⏭ Следую2щий трек', value: nextTrack.title, inline: true },
+        { name: '⏭ Следующий трек', value: nextTrack.title, inline: true },
         { name: '', value: '', inline: true },
         { name: '🎤 Исполнитель', value: nextTrack.artist, inline: true },
       );

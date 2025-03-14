@@ -271,7 +271,13 @@ export class VoiceService {
 
       if (!fs.existsSync(dirPath)) fs.mkdirSync(dirPath, { recursive: true });
 
-      fs.writeFileSync(filePath, buffer);
+      fs.writeFile(filePath, buffer, (err) => {
+        if (err) {
+          console.error('Error writing file', err);
+          throw new Error('Download track error');
+        }
+      });
+
       return filePath;
     } catch (e) {
       console.error('Error download', e);

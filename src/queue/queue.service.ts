@@ -32,6 +32,18 @@ export class QueueService {
 
     return queue;
   }
+
+  async getQueueLength(guildId: string) {
+    const queue = await this.prisma.queue.findFirst({
+      where: {
+        guildId,
+      },
+    });
+
+    if (!queue) {
+      return 0;
+    }
+  }
   async addTrackToQueue(guildId: string, trackId: string) {
     let queue = await this.prisma.queue.findFirst({
       where: {
