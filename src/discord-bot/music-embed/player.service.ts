@@ -18,12 +18,12 @@ export class PlayerService {
     [interaction]: SlashCommandContext,
   ) {
     /* eslint-disable */
-    const bgPath = await this.generateTrackCard(currentTrack);
-    const buildedBgPath = new AttachmentBuilder(bgPath);
-    const fileNameBg = path.basename(bgPath);
-    console.log(fileNameBg);
-    console.log(buildedBgPath);
-    console.log(bgPath);
+    // const bgPath = await this.generateTrackCard(currentTrack);
+    // const buildedBgPath = new AttachmentBuilder(bgPath);
+    // const fileNameBg = path.basename(bgPath);
+    // console.log(fileNameBg);
+    // console.log(buildedBgPath);
+    // console.log(bgPath);
 
     const queueItems = queue.items;
     const queueTracks = queueItems.filter(
@@ -69,8 +69,7 @@ export class PlayerService {
       .addFields(
         { name: '👤 Исполнитель', value: currentTrack.artist, inline: true },
         { name: '🕒 Длительность', value: currentTrack.duration, inline: true },
-      )
-      .setImage(`attachment://${fileNameBg}` || '');
+      );
 
     if (queueTracksLength > 0 || playlistTracksLength > 0) {
       embed.addFields({
@@ -111,13 +110,13 @@ export class PlayerService {
       message.id,
     );
 
-    setTimeout(async () => {
-      fs.unlink(bgPath, (err) => {
-        if (err) {
-          console.error('error unlink');
-        }
-      });
-    }, 5000);
+    // setTimeout(async () => {
+    //   fs.unlink(bgPath, (err) => {
+    //     if (err) {
+    //       console.error('error unlink');
+    //     }
+    //   });
+    // }, 5000);
 
     return;
   }
