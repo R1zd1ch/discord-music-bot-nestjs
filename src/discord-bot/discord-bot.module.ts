@@ -6,13 +6,16 @@ import { IntentsBitField } from 'discord.js';
 import { YandexMusicModule } from 'src/yandex-music/yandex-music.module';
 import { VoiceService } from './voice.service';
 import { DiscordBotController } from './discord-bot.controller';
-import { MusicControls } from './music-embed/music-controls.service';
+
 import { PlaylistModule } from 'src/playlist/playlist.module';
 import { QueueModule } from 'src/queue/queue.module';
 import { UserModule } from 'src/user/user.module';
 import { PlaylistService } from 'src/playlist/playlist.service';
 import { QueueService } from 'src/queue/queue.service';
 import { UserService } from 'src/user/user.service';
+import { TrackService } from 'src/track/track.service';
+import { TrackModule } from 'src/track/track.module';
+import { PlayerService } from './music-embed/player.service';
 
 @Module({
   controllers: [DiscordBotController],
@@ -32,14 +35,16 @@ import { UserService } from 'src/user/user.service';
     PlaylistModule,
     QueueModule,
     UserModule,
+    TrackModule,
   ],
   providers: [
     DiscordBotService,
     VoiceService,
-    MusicControls,
     PlaylistService,
     QueueService,
     UserService,
+    TrackService,
+    PlayerService,
   ],
 })
 export class DiscordBotModule {}

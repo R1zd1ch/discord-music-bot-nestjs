@@ -9,6 +9,7 @@ import { PrismaModule } from './prisma/prisma.module';
 import { QueueModule } from './queue/queue.module';
 import { PlaylistModule } from './playlist/playlist.module';
 import { UserModule } from './user/user.module';
+import { TrackModule } from './track/track.module';
 
 @Module({
   imports: [
@@ -21,6 +22,7 @@ import { UserModule } from './user/user.module';
     QueueModule,
     PlaylistModule,
     UserModule,
+    TrackModule,
   ],
   providers: [AppService],
 })

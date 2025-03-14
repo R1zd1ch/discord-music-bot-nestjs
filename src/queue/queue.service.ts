@@ -7,7 +7,7 @@ export class QueueService {
   constructor(private readonly prisma: PrismaService) {}
 
   async getQueue(guildId: string) {
-    return this.prisma.queue.findUnique({
+    const queue = this.prisma.queue.findUnique({
       where: {
         guildId,
       },
@@ -29,6 +29,8 @@ export class QueueService {
         },
       },
     });
+
+    return queue;
   }
   async addTrackToQueue(guildId: string, trackId: string) {
     let queue = await this.prisma.queue.findFirst({
@@ -41,6 +43,14 @@ export class QueueService {
       queue = await this.prisma.queue.create({ data: { guildId } });
     }
 
+    const track = await this.prisma.track.findUnique({
+      where: { trackId },
+    });
+
+    if (!track) {
+      throw new Error(`Track ${trackId} not found in database`);
+    }
+
     const position = await this.prisma.queueItem.count({
       where: {
         queueId: queue.id,
@@ -50,10 +60,43 @@ export class QueueService {
     return this.prisma.queueItem.create({
       data: {
         queueId: queue.id,
-        trackId,
+        trackId: trackId,
         type: QueueItemType.TRACK,
         position,
       },
+    });
+  }
+
+  async addTracksToQueue(guildId: string, trackIds: string[]) {
+    let queue = await this.prisma.queue.findFirst({
+      where: {
+        guildId,
+      },
+    });
+
+    if (!queue) {
+      queue = await this.prisma.queue.create({
+        data: {
+          guildId,
+        },
+      });
+    }
+
+    const currentPosition = await this.prisma.queueItem.count({
+      where: {
+        queueId: queue.id,
+      },
+    });
+
+    const queueItems = trackIds.map((trackId, index) => ({
+      queueId: queue.id,
+      trackId,
+      type: QueueItemType.TRACK,
+      position: currentPosition + index,
+    }));
+
+    return this.prisma.queueItem.createMany({
+      data: queueItems,
     });
   }
 
@@ -87,7 +130,7 @@ export class QueueService {
 
   async nextTrack(guildId: string) {
     const queue = await this.getQueue(guildId);
-    if (!queue || queue.items.length < 2) return;
+    if (!queue || queue.items.length === 0) return;
 
     const currentTrack = queue.items[0];
 
@@ -118,7 +161,7 @@ export class QueueService {
 
   async prevTrack(guildId: string) {
     const queue = await this.getQueue(guildId);
-    if (!queue || queue.items.length < 2) return;
+    if (!queue || queue.items.length === 0) return;
 
     const currentTrack = queue.items[0];
 
@@ -163,5 +206,40 @@ export class QueueService {
         id: queueItem.id,
       },
     });
+  }
+
+  async updatePlayerMessageId(guildId: string, messageId: string) {
+    return this.prisma.queue.update({
+      where: {
+        guildId,
+      },
+      data: {
+        playerMessageId: messageId,
+      },
+    });
+  }
+
+  async clearQueue(guildId: string) {
+    const queue = await this.prisma.queue.findFirst({
+      where: {
+        guildId,
+      },
+    });
+
+    if (!queue) return;
+
+    return this.prisma.queueItem
+      .deleteMany({
+        where: {
+          queueId: queue.id,
+        },
+      })
+      .then(() =>
+        this.prisma.queue.delete({
+          where: {
+            id: queue.id,
+          },
+        }),
+      );
   }
 }

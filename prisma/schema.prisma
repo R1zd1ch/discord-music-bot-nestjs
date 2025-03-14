@@ -23,7 +23,7 @@ model Playlist {
   id     String          @id @default(uuid())
   name   String
   userId String?
-  user   User?           @relation(fields: [userId], references: [id])
+  user   User?           @relation(fields: [userId], references: [discordId])
   tracks PlaylistTrack[]
 
   createdAt DateTime    @default(now())
@@ -35,7 +35,7 @@ model PlaylistTrack {
   id         String   @id @default(uuid())
   playlistId String
   playlist   Playlist @relation(fields: [playlistId], references: [id], onDelete: Cascade)
-  track      Track    @relation(fields: [trackId], references: [id])
+  track      Track    @relation(fields: [trackId], references: [trackId])
   trackId    String
 
   createdAt DateTime @default(now())
@@ -56,9 +56,10 @@ model Track {
 }
 
 model Queue {
-  id      String      @id @default(uuid())
-  guildId String      @unique
-  items   QueueItem[]
+  id              String      @id @default(uuid())
+  guildId         String      @unique
+  items           QueueItem[]
+  playerMessageId String?
 
   loopMode   LoopMode @default(NONE)
   isShuffled Boolean  @default(false)
@@ -82,7 +83,7 @@ model QueueItem {
   queueId String
 
   type    QueueItemType //Track or Playlist
-  track   Track?        @relation(fields: [trackId], references: [id])
+  track   Track?        @relation(fields: [trackId], references: [trackId])
   trackId String?
 
   playlist     Playlist? @relation(fields: [playlistId], references: [id])
