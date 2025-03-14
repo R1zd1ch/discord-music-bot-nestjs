@@ -53,6 +53,15 @@ jobs:
           host: ${{ secrets.SERVER_IP }}
           username: ${{ secrets.SERVER_USER }}
           password: ${{secrets.SERVER_PASSWORD}}
-          script: whoami
+          script: |
+            cd /myprojects
+            if [! -d "discord-music-bot-nestjs" ]; then
+              echo "Repository not found. ТЫ ГАНДОН!!!"
+              git clone https://github.com/R1zd1ch/discord-music-bot-nestjs.git
+            else
+              echo "Repository already exists."
+            fi
+            cd discord-music-bot-nestjs
+            ls -la
           capture_stdout: true
     
