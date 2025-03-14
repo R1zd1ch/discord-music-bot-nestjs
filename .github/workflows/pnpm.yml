@@ -54,8 +54,8 @@ jobs:
           username: ${{ secrets.SERVER_USER }}
           password: ${{secrets.SERVER_PASSWORD}}
           script: |
-            cd /myprojects
-            if [! -d "discord-music-bot-nestjs" ]; then
+            cd myprojects/
+            if [ ! -d "discord-music-bot-nestjs" ]; then
               echo "Repository not found. ТЫ ГАНДОН!!!"
               git clone https://github.com/R1zd1ch/discord-music-bot-nestjs.git
             else
