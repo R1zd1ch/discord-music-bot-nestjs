@@ -4,10 +4,11 @@ WORKDIR /app
 
 COPY package.json pnpm-lock.yaml ./
 
-# Устанавливаем pnpm
 RUN corepack enable && corepack prepare pnpm@latest --activate
 
 RUN pnpm install
+
+RUN apk add --no-cache ffmpeg
 
 COPY . .
 
