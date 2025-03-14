@@ -1,0 +1,10 @@
+version: '3.8'
+
+services:
+  app:
+    container_name: discord-music-bot
+    build: .
+    restart: always
+    env_file: .env
+    ports:
+      - '3000:3000'
