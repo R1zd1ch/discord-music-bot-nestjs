@@ -56,7 +56,7 @@ jobs:
           script: |
             cd myprojects/
             if [ ! -d "discord-music-bot-nestjs" ]; then
-              echo "Repository not found. ТЫ ГАНДОН!!!"
+              echo "Repository not found."
               git clone https://github.com/R1zd1ch/discord-music-bot-nestjs.git
             else
               echo "Repository already exists."
@@ -64,9 +64,11 @@ jobs:
             cd discord-music-bot-nestjs
             ls -la
             git pull
-            echo "DISCORD_TOKEN=${{secret.DISCORD_TOKEN}}" > .env
-            echo "YANDEX_MUSIC_TOKEN=${{secret.YANDEX_MUSIC_TOKEN}}" >> .env
-            echo "DATABASE_URL=${{secret.DATABASE_URL}}" >> .env
+          
+            # Создание .env с корректным синтаксисом
+            echo "DISCORD_TOKEN=${{ secrets.DISCORD_TOKEN }}" > .env
+            echo "YANDEX_MUSIC_TOKEN=${{ secrets.YANDEX_MUSIC_TOKEN }}" >> .env
+            echo "DATABASE_URL=${{ secrets.DATABASE_URL }}" >> .env
             
           capture_stdout: true
     
