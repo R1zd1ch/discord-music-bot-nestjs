@@ -1,7 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
 import {
-  Button,
-  ButtonContext,
   Context,
   ContextOf,
   On,
@@ -13,13 +11,7 @@ import {
 import { PlayDto } from './dtos/play.dto';
 import { VoiceService } from './voice.service';
 import { YandexMusicService } from 'src/yandex-music/yandex-music.service';
-import {
-  ActionRowBuilder,
-  ButtonBuilder,
-  ButtonStyle,
-  GuildMember,
-  VoiceState,
-} from 'discord.js';
+import { GuildMember, VoiceState } from 'discord.js';
 import { UserService } from 'src/user/user.service';
 
 @Injectable()
@@ -96,6 +88,14 @@ export class DiscordBotService {
     if (message.content === 'ping') {
       await message.reply('pong');
     }
+  }
+
+  @On('voiceStateUpdate')
+  async onVoiceStateUpdate(
+    @Context() [voiceState]: ContextOf<'voiceStateUpdate'>,
+  ) {
+    // this.logger.debug(voiceState.member?.user.bot);
+    // this.logger.debug(voiceState.member);
   }
 
   // @On('voiceStateUpdate')

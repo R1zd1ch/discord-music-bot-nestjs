@@ -3,6 +3,7 @@ import { YandexMusicClient } from 'yandex-music-client';
 import { getTrackUrl } from 'yandex-music-client/trackUrl';
 import { TrackService } from 'src/track/track.service';
 import { CreateTrackDto } from 'src/track/dtos/create-track.dto';
+import { Track } from '@prisma/client';
 
 @Injectable()
 export class YandexMusicService {
@@ -68,7 +69,7 @@ export class YandexMusicService {
     const addedToDb = await this.tracksService.createTracks(toDtoTracks);
 
     return {
-      tracks: [...addedToDb],
+      tracks: [...(toDtoTracks as Track[])],
       playlistName: response.title,
     };
   }
@@ -101,7 +102,7 @@ export class YandexMusicService {
     const addedToDb = await this.tracksService.createTrack(toDtoTrack);
 
     return {
-      tracks: [addedToDb],
+      tracks: [toDtoTrack as Track],
     };
   }
 
@@ -135,7 +136,7 @@ export class YandexMusicService {
     const addedToDb = await this.tracksService.createTracks(toDtoTracks);
 
     return {
-      tracks: [...addedToDb],
+      tracks: [...(toDtoTracks as Track[])],
     };
   }
 
@@ -169,7 +170,7 @@ export class YandexMusicService {
 
     const addedToDb = await this.tracksService.createTracks(toDtoTracks);
     return {
-      tracks: [...addedToDb],
+      tracks: [...(toDtoTracks as Track[])],
     };
   }
 

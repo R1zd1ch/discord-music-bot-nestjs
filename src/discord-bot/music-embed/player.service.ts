@@ -20,6 +20,8 @@ export class PlayerService {
     /* eslint-disable */
     const bgPath = await this.generateTrackCard(currentTrack);
     const buildedBgPath = new AttachmentBuilder(bgPath);
+    const fileNameBg = path.basename(bgPath);
+    console.log(fileNameBg);
     console.log(buildedBgPath);
     console.log(bgPath);
 
@@ -68,7 +70,7 @@ export class PlayerService {
         { name: '👤 Исполнитель', value: currentTrack.artist, inline: true },
         { name: '🕒 Длительность', value: currentTrack.duration, inline: true },
       )
-      .setImage(`attachment://${bgPath}` || '');
+      .setImage(`attachment://${fileNameBg}` || '');
 
     if (queueTracksLength > 0 || playlistTracksLength > 0) {
       embed.addFields({
@@ -101,6 +103,7 @@ export class PlayerService {
     const message = await interaction.editReply({
       embeds: [embed],
       fetchReply: true,
+      // files: [buildedBgPath],
     });
 
     await this.queueService.updatePlayerMessageId(
@@ -145,4 +148,6 @@ export class PlayerService {
       throw new Error('Generate track card error');
     }
   }
+
+  async uploadImageToImgBB(imagePath: string) {}
 }
