@@ -29,7 +29,6 @@ jobs:
           node-version: 20
           cache: 'pnpm'
 
-
       - name: Verify pnpm installation
         run: pnpm --version
 
@@ -64,11 +63,14 @@ jobs:
             cd discord-music-bot-nestjs
             ls -la
             git pull
-          
+
             # Создание .env с корректным синтаксисом
             echo "DISCORD_TOKEN=${{ secrets.DISCORD_TOKEN }}" > .env
             echo "YANDEX_MUSIC_TOKEN=${{ secrets.YANDEX_MUSIC_TOKEN }}" >> .env
             echo "DATABASE_URL=${{ secrets.DATABASE_URL }}" >> .env
-            
+
+            docker-compose down
+            docker-compose down --rmi all
+            docker-compose up -d --build
+
           capture_stdout: true
-    
