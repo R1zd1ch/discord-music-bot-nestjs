@@ -43,7 +43,7 @@ export class YandexMusicService {
 
     const response = (
       await this.yandexMusicClient.playlists.getPlaylistById(
-        uuid,
+        uuid as any,
         parseInt(playlistId),
       )
     ).result;
