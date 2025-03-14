@@ -50,7 +50,10 @@ export class TrackService {
     );
 
     if (newTracks.length > 0) {
-      await this.prisma.track.createMany({ data: newTracks });
+      await this.prisma.track.createMany({
+        data: newTracks,
+        skipDuplicates: true,
+      });
     }
 
     return this.prisma.track.findMany({
