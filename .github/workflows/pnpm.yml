@@ -63,5 +63,7 @@ jobs:
             fi
             cd discord-music-bot-nestjs
             ls -la
+            git pull
+            
           capture_stdout: true
     
