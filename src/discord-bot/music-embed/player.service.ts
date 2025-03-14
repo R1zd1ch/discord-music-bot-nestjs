@@ -22,7 +22,7 @@ export class PlayerService {
     const buildedBgPath = new AttachmentBuilder(bgPath);
     console.log(buildedBgPath);
     console.log(bgPath);
-    console.log('пенис большой очень');
+
     const queueItems = queue.items;
     const queueTracks = queueItems.filter(
       (item) => item.type === QueueItemType.TRACK,
