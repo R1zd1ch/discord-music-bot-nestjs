@@ -5,11 +5,11 @@ name: Node.js Package
 
 on:
   push:
-    branches: [ "master" ]
-  pull_request: 
-    branches: [ "master" ]
+    branches: ['master']
+  pull_request:
+    branches: ['master']
 
-permissions: 
+permissions:
   contents: read
   security-events: write
 
@@ -30,4 +30,3 @@ jobs:
 
       - name: Build NestJS app
         run: pnpm run build
-
