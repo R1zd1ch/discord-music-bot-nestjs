@@ -64,6 +64,9 @@ jobs:
             cd discord-music-bot-nestjs
             ls -la
             git pull
+            echo "DISCORD_TOKEN=${{secret.DISCORD_TOKEN}}" > .env
+            echo "YANDEX_MUSIC_TOKEN=${{secret.YANDEX_MUSIC_TOKEN}}" >> .env
+            echo "DATABASE_URL=${{secret.DATABASE_URL}}" >> .env
             
           capture_stdout: true
     
