@@ -8,6 +8,7 @@ import {
   joinVoiceChannel,
   VoiceConnection,
   VoiceConnectionStatus,
+  generateDependencyReport,
 } from '@discordjs/voice';
 import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { YandexMusicService } from 'src/yandex-music/yandex-music.service';
@@ -48,6 +49,7 @@ export class VoiceService {
   ) {
     await interaction.deferReply();
     this.logger.log(`Joining voice channel ${channelId} in guild ${guildId}`);
+    this.logger.debug(generateDependencyReport());
     await this.ensureVoiceConnection(guildId, channelId, adapterCreator);
 
     const response = await this.yandexMusicService.searchYM(url);
@@ -82,10 +84,11 @@ export class VoiceService {
 
     this.logger.log('Playback started');
 
+    //eslint-disable-next-line
     message = await interaction.followUp({
       content: 'Плейлист или трек добавлен в очередь',
     });
-
+    //eslint-disable-next-line
     setTimeout(() => void message.delete(), 2000);
   }
 
@@ -145,7 +148,6 @@ export class VoiceService {
       });
     } catch (e) {
       this.cleanup(guildId);
-      this.connections.get(guildId)?.destroy();
       throw new Error(`Queue proccessing Error: ${e}`);
     }
   }
@@ -286,7 +288,7 @@ export class VoiceService {
     }
   }
 
-  private cleanup(guildId: string) {
+  cleanup(guildId: string) {
     this.players.get(guildId)?.stop();
     this.connections.get(guildId)?.destroy();
     this.players.delete(guildId);
@@ -296,6 +298,7 @@ export class VoiceService {
   private async updateMusicMessage(
     guildId: string,
     [interaction]: SlashCommandContext,
+    isPaused: boolean = false,
   ) {
     const queue = await this.queueService.getQueue(guildId);
     if (!queue || queue.items.length === 0) return;
@@ -305,19 +308,55 @@ export class VoiceService {
     if (!track || track instanceof NotFoundException) return;
 
     this.logger.log(`Updating music message for guild ${guildId}`);
-    await this.renderPlayerService.renderMusicMessage(track, queue, [
-      interaction,
-    ]);
+    await this.renderPlayerService.renderMusicMessage(
+      track,
+      queue,
+      [interaction],
+      isPaused,
+    );
 
     return;
   }
 
-  getConnection(guildId: string) {
+  public async prevTrack(guildId: string, [interaction]: SlashCommandContext) {
+    await this.queueService.prevTrack(guildId).finally(() => {
+      this.proccesQueue(guildId, [interaction]);
+    });
+
+    await this.updateMusicMessage(guildId, [interaction]);
+  }
+
+  public async nextTrack(guildId: string, [interaction]: SlashCommandContext) {
+    await this.queueService.nextTrack(guildId).finally(() => {
+      this.proccesQueue(guildId, [interaction]);
+    });
+
+    await this.updateMusicMessage(guildId, [interaction]);
+  }
+
+  public async togglePause(
+    guildId: string,
+    [interaction]: SlashCommandContext,
+  ) {
+    const player = this.getPlayer(guildId);
+    if (!player) return;
+
+    const wasPaused = player.state.status === AudioPlayerStatus.Paused;
+
+    if (wasPaused) {
+      player.unpause();
+    } else {
+      player.pause();
+    }
+
+    await this.updateMusicMessage(guildId, [interaction], !wasPaused);
+  }
+
+  public getConnection(guildId: string) {
     return this.connections.get(guildId);
   }
 
-  // private async userCount(guildId: string, channelId: string) {
-  //   try {
-  //   } catch (e: any) {}
-  // }
+  public getPlayer(guildId: string) {
+    return this.players.get(guildId);
+  }
 }

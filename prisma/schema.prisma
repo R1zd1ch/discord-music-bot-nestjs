@@ -59,6 +59,7 @@ model Queue {
   id              String      @id @default(uuid())
   guildId         String      @unique
   items           QueueItem[]
+  currentPosition Int         @default(0)
   playerMessageId String?
 
   loopMode   LoopMode @default(NONE)

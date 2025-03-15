@@ -1,5 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import {
+  Button,
+  ButtonContext,
   Context,
   ContextOf,
   On,
@@ -11,8 +13,9 @@ import {
 import { PlayDto } from './dtos/play.dto';
 import { VoiceService } from './voice.service';
 import { YandexMusicService } from 'src/yandex-music/yandex-music.service';
-import { Client, GuildMember, VoiceState } from 'discord.js';
+import { Client, GuildMember } from 'discord.js';
 import { UserService } from 'src/user/user.service';
+import { AudioPlayerStatus } from '@discordjs/voice';
 
 @Injectable()
 export class DiscordBotService {
@@ -98,7 +101,7 @@ export class DiscordBotService {
 
     if (!voiceChannel) return;
 
-    this.logger.debug(voiceChannel);
+    this.logger.debug(voiceChannel.id);
 
     if (
       voiceChannel.members.size === 1 &&
@@ -111,12 +114,58 @@ export class DiscordBotService {
         );
 
         if (connection) {
-          connection.destroy();
+          this.voiceService.cleanup(voiceChannel.guildId);
           this.logger.debug(`🔇 Покидаем канал ${voiceChannel.id}`);
+          return;
         }
       }, this.TIMEOUT);
     }
 
     await Promise.resolve();
+  }
+
+  @Button('prev')
+  public async onPrevButton(@Context() [interaction]: SlashCommandContext) {
+    const guildId = interaction.guildId;
+
+    if (!guildId) return;
+
+    await this.voiceService.prevTrack(guildId, [interaction]);
+    await interaction.reply({ content: 'Bebra' });
+  }
+
+  @Button('next')
+  public async onNextButton(@Context() [interaction]: SlashCommandContext) {
+    const guildId = interaction.guildId;
+    const user = interaction.user.username;
+
+    if (!user || !guildId) return;
+
+    await this.voiceService.nextTrack(guildId, [interaction]);
+    const message = await interaction.reply({
+      content: `${user} пропустил трек`,
+    });
+    setTimeout(() => {
+      message.delete();
+    }, 2000);
+  }
+
+  @Button('resume_pause')
+  public async onPauseButton(@Context() [interaction]: SlashCommandContext) {
+    const guildId = interaction.guildId;
+    if (!guildId) return;
+    const player = this.voiceService.getPlayer(guildId);
+    const isPaused = player?.state.status === AudioPlayerStatus.Paused;
+
+    await this.voiceService.togglePause(guildId, [interaction]);
+
+    await interaction.deferReply();
+    const message = await interaction.followUp({
+      content: isPaused ? '▶️ Воспроизведение' : '⏸ Пауза',
+    });
+
+    setTimeout(() => {
+      message.delete();
+    }, 2000);
   }
 }

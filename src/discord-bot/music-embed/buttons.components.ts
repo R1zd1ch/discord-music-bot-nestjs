@@ -4,31 +4,48 @@ export default function buttonsComponents(isPaused: boolean) {
   return [
     new ActionRowBuilder<ButtonBuilder>().addComponents(
       new ButtonBuilder()
-        .setCustomId(`${isPaused ? 'resume' : 'pause'}`)
-        .setLabel(`${isPaused ? '▶️' : '⏸️'}`)
-        .setStyle(ButtonStyle.Primary),
+        .setCustomId('prev')
+        .setLabel('⏮️')
+        .setStyle(ButtonStyle.Secondary),
       new ButtonBuilder()
-        .setCustomId('skip')
+        .setCustomId('resume_pause')
+        .setLabel(`${isPaused ? '▶️' : '⏸️'}`)
+        .setStyle(isPaused ? ButtonStyle.Primary : ButtonStyle.Secondary),
+      new ButtonBuilder()
+        .setCustomId('stopPlay')
+        .setLabel('⏹️')
+        .setStyle(ButtonStyle.Danger),
+      new ButtonBuilder()
+        .setCustomId('next')
         .setLabel('⏭️')
         .setStyle(ButtonStyle.Primary),
       new ButtonBuilder()
-        .setCustomId('skipAll')
+        .setCustomId('skipItem')
         .setLabel('⏩')
         .setStyle(ButtonStyle.Primary),
     ),
+
     new ActionRowBuilder<ButtonBuilder>().addComponents(
-      new ButtonBuilder()
-        .setCustomId('shuffle')
-        .setLabel('🔀')
-        .setStyle(ButtonStyle.Primary),
       new ButtonBuilder()
         .setCustomId('repeat')
         .setLabel('🔁')
-        .setStyle(ButtonStyle.Primary),
+        .setStyle(ButtonStyle.Secondary),
+      new ButtonBuilder()
+        .setCustomId('shuffle')
+        .setLabel('🔀')
+        .setStyle(ButtonStyle.Secondary),
       new ButtonBuilder()
         .setCustomId('queue')
-        .setLabel('📜')
-        .setStyle(ButtonStyle.Primary),
+        .setLabel('📋')
+        .setStyle(ButtonStyle.Secondary),
+      new ButtonBuilder()
+        .setCustomId('help')
+        .setLabel('❓')
+        .setStyle(ButtonStyle.Secondary),
+      new ButtonBuilder()
+        .setCustomId('volume')
+        .setLabel('🔊')
+        .setStyle(ButtonStyle.Secondary),
     ),
   ];
 }

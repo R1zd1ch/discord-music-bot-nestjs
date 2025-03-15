@@ -2,12 +2,10 @@
 //@ts-nocheck
 import { Injectable } from '@nestjs/common';
 import { Queue, QueueItem, QueueItemType, Track } from '@prisma/client';
-import { AttachmentBuilder, EmbedBuilder } from 'discord.js';
+import { EmbedBuilder } from 'discord.js';
 import { SlashCommandContext } from 'necord';
 import { QueueService } from 'src/queue/queue.service';
-import { Jimp } from 'jimp';
-import * as path from 'path';
-import * as fs from 'fs';
+import buttonsComponents from './buttons.components';
 
 @Injectable()
 export class PlayerService {
@@ -16,14 +14,9 @@ export class PlayerService {
     currentTrack: Track,
     queue: Queue,
     [interaction]: SlashCommandContext,
+    isPaused: boolean = false,
   ) {
     /* eslint-disable */
-    // const bgPath = await this.generateTrackCard(currentTrack);
-    // const buildedBgPath = new AttachmentBuilder(bgPath);
-    // const fileNameBg = path.basename(bgPath);
-    // console.log(fileNameBg);
-    // console.log(buildedBgPath);
-    // console.log(bgPath);
 
     const queueItems = queue.items;
     const queueTracks = queueItems.filter(
@@ -37,8 +30,7 @@ export class PlayerService {
     const queueTracksLength = queueTracks.length || 0;
     const playlistTracksLength =
       queuePlaylists.reduce((acc, item: QueueItem) => {
-        const itemsCount =
-          item.playlist.tracks.length - (item.currentIndex + 1);
+        const itemsCount = item.playlist.tracks.length - item.currentIndex;
 
         return acc + itemsCount;
       }, 0) || 0;
@@ -68,20 +60,24 @@ export class PlayerService {
       .setThumbnail(currentTrack.coverUrl || '')
       .addFields(
         { name: '👤 Исполнитель', value: currentTrack.artist, inline: true },
-        { name: '🕒 Длительность', value: currentTrack.duration, inline: true },
+        {
+          name: '🕒 Длительность',
+          value: this.formatDuration(currentTrack.duration),
+          inline: true,
+        },
       );
 
     if (queueTracksLength > 0 || playlistTracksLength > 0) {
       embed.addFields({
-        name: '📜 В очереди',
-        value: `${queueTracksLength + playlistTracksLength - 1} трек(ов)`,
+        name: '📜 До конца',
+        value: `${queueTracksLength + playlistTracksLength} трек(ов)`,
         inline: false,
       });
     }
 
     if (nextTrack) {
       embed.addFields(
-        { name: '\u200B', value: '\u200B' }, // Разделитель
+        { name: '\u200B', value: '\u200B' },
         { name: '⏭ Следующий трек', value: nextTrack.title, inline: true },
         { name: '', value: '', inline: true },
         { name: '🎤 Исполнитель', value: nextTrack.artist, inline: true },
@@ -93,7 +89,11 @@ export class PlayerService {
         queue.playerMessageId,
       );
       if (oldMessage) {
-        await oldMessage.edit({ embeds: [embed] });
+        await oldMessage.edit({
+          embeds: [embed],
+          fetchReply: true,
+          components: [...buttonsComponents(isPaused)],
+        });
         return;
       }
       return;
@@ -102,7 +102,7 @@ export class PlayerService {
     const message = await interaction.editReply({
       embeds: [embed],
       fetchReply: true,
-      // files: [buildedBgPath],
+      components: [...buttonsComponents(isPaused)],
     });
 
     await this.queueService.updatePlayerMessageId(
@@ -110,43 +110,13 @@ export class PlayerService {
       message.id,
     );
 
-    // setTimeout(async () => {
-    //   fs.unlink(bgPath, (err) => {
-    //     if (err) {
-    //       console.error('error unlink');
-    //     }
-    //   });
-    // }, 5000);
-
     return;
   }
 
-  private async generateTrackCard(track: Track) {
-    //eslint-enable
-    //@ts-check
-    // const font = await Jimp.loadFont();
-    try {
-      console.log(track);
-      const image = await Jimp.read(track.coverUrl as string);
-      image.resize({ w: 200, h: 200 });
-      const background = new Jimp({
-        width: 800,
-        height: 300,
-        color: '#E8D3C7',
-      });
-      const newImage = await background.composite(image, 0, 0);
-
-      const dirPath = path.join(__dirname, '..', '..', 'temp');
-      if (!fs.existsSync(dirPath)) fs.mkdirSync(dirPath, { recursive: true });
-      const tempPath = path.join(dirPath, `${Date.now()}.png`);
-
-      await newImage.write(tempPath).catch((err) => console.error(err));
-      return tempPath;
-    } catch (e) {
-      console.error('error generate', e);
-      throw new Error('Generate track card error');
-    }
+  private formatDuration(ms: string): string {
+    const numberedDuratin = Number(ms);
+    return `${Math.floor(ms / 60000)}:${((ms / 1000) % 60)
+      .toFixed(0)
+      .padStart(2, '0')}`;
   }
-
-  async uploadImageToImgBB(imagePath: string) {}
 }

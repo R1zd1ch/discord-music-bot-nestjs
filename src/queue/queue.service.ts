@@ -148,25 +148,52 @@ export class QueueService {
 
     if (currentTrack.type === QueueItemType.PLAYLIST && currentTrack.playlist) {
       const playlistTracks = currentTrack.playlist.tracks;
+
       if (currentTrack.currentIndex < playlistTracks.length - 1) {
         await this.prisma.queueItem.update({
-          where: {
-            id: currentTrack.id,
-          },
-          data: {
-            currentIndex: currentTrack.currentIndex + 1,
-          },
+          where: { id: currentTrack.id },
+          data: { currentIndex: currentTrack.currentIndex + 1 },
         });
         return this.getQueue(guildId);
       }
     }
 
-    await this.prisma.$transaction(async (prisma) => {
-      await prisma.queueItem.update({
-        where: { id: queue.items[0].id },
-        data: { position: queue.items[queue.items.length - 1].position + 1 },
+    // await this.prisma.$transaction(async (prisma) => {
+    //   await prisma.queueItem.update({
+    //     where: { id: queue.items[0].id },
+    //     data: { position: queue.items[queue.items.length - 1].position + 1 },
+    //   });
+    // });
+
+    if (queue.currentPosition < queue.items.length - 1) {
+      await this.prisma.queue.update({
+        where: {
+          guildId,
+        },
+        data: {
+          currentPosition: queue.currentPosition + 1,
+        },
       });
-    });
+    }
+
+    return this.getQueue(guildId);
+  }
+
+  async nextItem(guildId: string) {
+    const queue = await this.getQueue(guildId);
+
+    if (!queue || queue.items.length === 0) return;
+
+    if (queue.currentPosition < queue.items.length - 1) {
+      await this.prisma.queue.update({
+        where: {
+          guildId,
+        },
+        data: {
+          currentPosition: queue.currentPosition + 1,
+        },
+      });
+    }
 
     return this.getQueue(guildId);
   }
@@ -191,12 +218,24 @@ export class QueueService {
       }
     }
 
-    await this.prisma.$transaction(async (prisma) => {
-      await prisma.queueItem.update({
-        where: { id: queue.items[queue.items.length - 1].id },
-        data: { position: queue.items[0].position - 1 },
+    // await this.prisma.$transaction(async (prisma) => {
+    //   await prisma.queueItem.update({
+    //     where: { id: queue.items[queue.items.length - 1].id },
+    //     data: { position: queue.items[0].position - 1 },
+    //   });
+    // });
+
+    if (queue.currentPosition > 0) {
+      await this.prisma.queue.update({
+        where: { guildId },
+        data: { currentPosition: { decrement: 1 } },
       });
-    });
+    } else {
+      await this.prisma.queue.update({
+        where: { guildId },
+        data: { currentPosition: queue.items.length - 1 },
+      });
+    }
 
     return this.getQueue(guildId);
   }
@@ -229,6 +268,20 @@ export class QueueService {
         playerMessageId: messageId,
       },
     });
+  }
+
+  async getPlayerMessageId(guildId: string) {
+    const queue = await this.prisma.queue.findFirst({
+      where: {
+        guildId,
+      },
+      select: {
+        playerMessageId: true,
+      },
+    });
+    console.log(queue);
+
+    return queue;
   }
 
   async clearQueue(guildId: string) {
