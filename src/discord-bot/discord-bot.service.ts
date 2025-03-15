@@ -11,7 +11,7 @@ import {
 import { PlayDto } from './dtos/play.dto';
 import { VoiceService } from './voice.service';
 import { YandexMusicService } from 'src/yandex-music/yandex-music.service';
-import { GuildMember, VoiceState } from 'discord.js';
+import { Client, GuildMember, VoiceState } from 'discord.js';
 import { UserService } from 'src/user/user.service';
 
 @Injectable()
@@ -20,8 +20,10 @@ export class DiscordBotService {
     private readonly voiceService: VoiceService,
     private readonly yandexMusicService: YandexMusicService,
     private readonly userService: UserService,
+    private readonly client: Client,
   ) {}
   private readonly logger = new Logger(DiscordBotService.name);
+  private readonly TIMEOUT = 1 * 60 * 1000;
   private inactivityTimers = new Map<string, NodeJS.Timeout>();
   @SlashCommand({ name: 'ping', description: 'Pong!' })
   public async onPing(@Context() [interaction]: SlashCommandContext) {
@@ -91,61 +93,30 @@ export class DiscordBotService {
   }
 
   @On('voiceStateUpdate')
-  async onVoiceStateUpdate(
-    @Context() [voiceState]: ContextOf<'voiceStateUpdate'>,
-  ) {
-    // this.logger.debug(voiceState.member?.user.bot);
-    // this.logger.debug(voiceState.member);
+  async onVoiceStateUpdate(@Context() [ctx]: ContextOf<'voiceStateUpdate'>) {
+    const voiceChannel = ctx.channel;
+
+    if (!voiceChannel) return;
+
+    this.logger.debug(voiceChannel);
+
+    if (
+      voiceChannel.members.size === 1 &&
+      voiceChannel.members.filter((member) => !member.user.bot).size === 0
+    ) {
+      this.logger.debug('checking');
+      setTimeout(() => {
+        const connection = this.voiceService.getConnection(
+          voiceChannel.guildId,
+        );
+
+        if (connection) {
+          connection.destroy();
+          this.logger.debug(`🔇 Покидаем канал ${voiceChannel.id}`);
+        }
+      }, this.TIMEOUT);
+    }
+
+    await Promise.resolve();
   }
-
-  // @On('voiceStateUpdate')
-  // async handleVoiceStatusUpdate(oldState: VoiceState, newState: VoiceState) {
-  //   const voiceChannel = newState.channel || oldState.channel;
-  //   if (!voiceChannel) return;
-
-  //   const members = voiceChannel.members.filter((member) => !member.user.bot);
-  //   const guildId = voiceChannel.guild.id;
-
-  //   if (members.size === 0) {
-  //     this.startInactivityTimer(voiceChannel.id, guildId);
-  //   } else {
-  //     this.clearInactivityTimer(voiceChannel.id);
-  //   }
-  // }
-
-  // private startInactivityTimer(channelId: string, guildId: string) {
-  //   if (this.inactivityTimers.has(channelId)) return;
-
-  //   this.logger.log(`🕒 Таймер на 10 минут запущен для ${channelId}`);
-
-  //   const timeout = setTimeout(
-  //     async () => {
-  //       const channel = await ;
-  //       if (channel?.isVoiceBased()) {
-  //         const voiceChannel = channel as any;
-  //         const members = voiceChannel.members.filter(
-  //           (member) => !member.user.bot,
-  //         );
-
-  //         if (members.size === 0) {
-  //           this.logger.log(
-  //             `🔇 Покидаем канал ${channelId} (гильдия ${guildId})`,
-  //           );
-  //           voiceChannel.leave();
-  //         }
-  //       }
-  //       this.inactivityTimers.delete(channelId);
-  //     },
-  //     10 * 60 * 1000,
-  //   ); // 10 минут
-
-  //   this.inactivityTimers.set(channelId, timeout);
-  // }
-  // private clearInactivityTimer(channelId: string) {
-  //   if (this.inactivityTimers.has(channelId)) {
-  //     clearTimeout(this.inactivityTimers.get(channelId));
-  //     this.inactivityTimers.delete(channelId);
-  //     this.logger.log(`✅ Таймер сброшен для ${channelId}`);
-  //   }
-  // }
 }

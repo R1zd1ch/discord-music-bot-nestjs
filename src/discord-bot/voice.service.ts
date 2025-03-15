@@ -145,6 +145,7 @@ export class VoiceService {
       });
     } catch (e) {
       this.cleanup(guildId);
+      this.connections.get(guildId)?.destroy();
       throw new Error(`Queue proccessing Error: ${e}`);
     }
   }
@@ -310,4 +311,13 @@ export class VoiceService {
 
     return;
   }
+
+  getConnection(guildId: string) {
+    return this.connections.get(guildId);
+  }
+
+  // private async userCount(guildId: string, channelId: string) {
+  //   try {
+  //   } catch (e: any) {}
+  // }
 }
