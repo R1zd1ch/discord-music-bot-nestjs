@@ -352,6 +352,11 @@ export class VoiceService {
     await this.updateMusicMessage(guildId, [interaction], !wasPaused);
   }
 
+  public async stop(guildId: string, [interaction]: SlashCommandContext) {
+    this.cleanup(guildId);
+    await Promise.resolve();
+  }
+
   public getConnection(guildId: string) {
     return this.connections.get(guildId);
   }

@@ -168,4 +168,11 @@ export class DiscordBotService {
       message.delete();
     }, 2000);
   }
+
+  @Button('stopPlay')
+  public async onStopButton(@Context() [interaction]: SlashCommandContext) {
+    const guildId = interaction.guildId;
+    if (!guildId) return;
+    await this.voiceService.stop(guildId, [interaction]);
+  }
 }
