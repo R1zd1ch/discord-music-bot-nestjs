@@ -16,6 +16,7 @@ import { YandexMusicService } from 'src/yandex-music/yandex-music.service';
 import { Client, GuildMember } from 'discord.js';
 import { UserService } from 'src/user/user.service';
 import { AudioPlayerStatus } from '@discordjs/voice';
+import { LoopMode } from '@prisma/client';
 
 @Injectable()
 export class DiscordBotService {
@@ -125,10 +126,12 @@ export class DiscordBotService {
 
       if (!(await this.checkUserInVoiceChannel([interaction]))) return;
 
-      await this.voiceService.prevTrack(guildId, [interaction]);
-
-      await interaction.editReply({
-        content: `${user} переместился назад`,
+      await this.voiceService.prevTrack(guildId, [interaction]).finally(() => {
+        interaction
+          .editReply({
+            content: `${user} переместился назад`,
+          })
+          .catch(() => {});
       });
     } catch {
       await interaction.editReply({
@@ -218,6 +221,30 @@ export class DiscordBotService {
       });
     }
 
+    setTimeout(() => {
+      interaction.deleteReply().catch(() => {});
+    }, 10000);
+  }
+
+  @Button('repeat')
+  public async onRepeatButton(@Context() [interaction]: SlashCommandContext) {
+    await interaction.deferReply({ ephemeral: true });
+    try {
+      const guildId = interaction.guildId;
+      const username = interaction.user.username;
+      if (!guildId) return;
+      if (!(await this.checkUserInVoiceChannel([interaction]))) return;
+
+      const mode = await this.voiceService.setLoopMode(guildId, [interaction]);
+
+      await interaction.editReply({
+        content: `${username} ${mode ? 'включил' : 'выключил'} повтор`,
+      });
+    } catch {
+      await interaction.editReply({
+        content: '❌ Произошла ошибка при повторении трека!',
+      });
+    }
     setTimeout(() => {
       interaction.deleteReply().catch(() => {});
     }, 10000);

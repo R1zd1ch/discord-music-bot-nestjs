@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { QueueItemType } from '@prisma/client';
+import { LoopMode, QueueItemType } from '@prisma/client';
 import { PrismaService } from 'src/prisma/prisma.service';
 
 @Injectable()
@@ -282,6 +282,34 @@ export class QueueService {
     console.log(queue);
 
     return queue;
+  }
+
+  async setLoopMode(guildId: string) {
+    const queue = await this.prisma.queue.findFirst({
+      where: {
+        guildId,
+      },
+      select: {
+        loopMode: true,
+      },
+    });
+
+    const loopMode = queue?.loopMode;
+
+    if (!loopMode) return;
+
+    const updatedLoopMode =
+      loopMode === LoopMode.NONE ? LoopMode.TRACK : LoopMode.NONE;
+
+    await this.prisma.queue.update({
+      where: {
+        guildId,
+      },
+      data: {
+        loopMode: updatedLoopMode,
+      },
+    });
+    return updatedLoopMode;
   }
 
   async clearQueue(guildId: string) {

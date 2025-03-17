@@ -37,7 +37,9 @@ export class VoiceService {
     private readonly trackService: TrackService,
     private readonly playlistService: PlaylistService,
     private readonly renderPlayerService: PlayerService,
-  ) {}
+  ) {
+    this.startCacheCleanupInterval();
+  }
 
   async playAudio(
     guildId: string,
@@ -133,9 +135,14 @@ export class VoiceService {
 
         void (async () => {
           if (queue.loopMode === LoopMode.TRACK) {
-            // todo: repeat mode on queueservice
             await Promise.resolve();
-          } else {
+          }
+
+          if (queue.loopMode === LoopMode.PLAYLIST) {
+            await Promise.resolve();
+          }
+
+          if (queue.loopMode === LoopMode.NONE) {
             await this.queueService.nextTrack(guildId);
           }
 
@@ -273,7 +280,13 @@ export class VoiceService {
           throw new Error('Invalid track source received');
         }
         const source = url.source;
-        const filepath = path.join(dirPath, `${Date.now()}-${trackId}.mp3`);
+        const filepath = path.join(dirPath, `${trackId}.mp3`);
+
+        if (fs.existsSync(filepath)) {
+          this.logger.log(`Using cached track: ${filepath}`);
+          return filepath;
+        }
+
         this.logger.log(`Download track ${retries + 1}`);
         const response = await axios.get(source, {
           responseType: 'arraybuffer',
@@ -315,6 +328,7 @@ export class VoiceService {
     guildId: string,
     [interaction]: SlashCommandContext,
     isPaused: boolean = false,
+    loopMode: LoopMode = LoopMode.NONE,
   ) {
     const queue = await this.queueService.getQueue(guildId);
     if (!queue || queue.items.length === 0) return;
@@ -332,6 +346,31 @@ export class VoiceService {
     );
 
     return;
+  }
+
+  private startCacheCleanupInterval() {
+    setInterval(
+      () => {
+        const dirPath = path.join(__dirname, '..', 'temp');
+        const now = Date.now();
+        const maxAge = 2 * 60 * 60 * 1000;
+
+        fs.readdir(dirPath, (err, files) => {
+          files.forEach((file) => {
+            const filePath = path.join(dirPath, file);
+            fs.stat(filePath, (err, stats) => {
+              if (now - stats.mtimeMs > maxAge) {
+                fs.unlink(filePath, (err) => {
+                  if (err) this.logger.error(`Cache cleanup error: ${err}`);
+                  else this.logger.log(`Cleaned up: ${filePath}`);
+                });
+              }
+            });
+          });
+        });
+      },
+      1 * 60 * 60 * 1000,
+    );
   }
 
   cleanup(guildId: string) {
@@ -378,6 +417,22 @@ export class VoiceService {
   public async stop(guildId: string, [interaction]: SlashCommandContext) {
     this.cleanup(guildId);
     await Promise.resolve();
+  }
+
+  public async setLoopMode(
+    guildId: string,
+
+    [interaction]: SlashCommandContext,
+  ) {
+    const loopMode = await this.queueService.setLoopMode(guildId);
+
+    const player = this.getPlayer(guildId);
+
+    if (!player) return;
+    const wasPaused = player.state.status === AudioPlayerStatus.Paused;
+
+    await this.updateMusicMessage(guildId, [interaction], wasPaused, loopMode);
+    return loopMode;
   }
 
   public getConnection(guildId: string) {
