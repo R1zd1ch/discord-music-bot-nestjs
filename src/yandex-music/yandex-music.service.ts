@@ -175,10 +175,39 @@ export class YandexMusicService {
   }
 
   async getTrackSourceYM(trackId: string) {
-    const source = await getTrackUrl(this.yandexMusicClient, trackId);
-    return {
-      source,
-    };
+    const maxRetries = 10;
+    let retries = 0;
+
+    while (retries < maxRetries) {
+      try {
+        const source = await getTrackUrl(this.yandexMusicClient, trackId);
+        if (retries > 0) {
+          await new Promise((res) => setTimeout(res, 2000 * retries));
+          this.logger.log(`Got track source ${trackId}`);
+        }
+
+        return { source };
+      } catch (e: any) {
+        retries++;
+        this.logger.error(`Yandex Music API error (attempt ${retries}): ${e}`);
+
+        if (
+          e &&
+          typeof e === 'object' &&
+          'statusCode' in e &&
+          e.statusCode === 403
+        ) {
+          this.logger.error('Access denied, check API credentials');
+          break;
+        }
+
+        if (retries === maxRetries) {
+          throw new Error(
+            `Yandex Music API unavailable after ${maxRetries} attempts`,
+          );
+        }
+      }
+    }
   }
 
   buildTrackUrl(trackId: string) {

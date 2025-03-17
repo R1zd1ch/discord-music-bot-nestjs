@@ -27,7 +27,7 @@ export class DiscordBotService {
   ) {}
   private readonly logger = new Logger(DiscordBotService.name);
   private readonly TIMEOUT = 1 * 60 * 1000;
-  private inactivityTimers = new Map<string, NodeJS.Timeout>();
+
   @SlashCommand({ name: 'ping', description: 'Pong!' })
   public async onPing(@Context() [interaction]: SlashCommandContext) {
     return interaction.reply({ content: 'Pong!' });
@@ -49,26 +49,15 @@ export class DiscordBotService {
     const member = interaction.member as GuildMember;
     const userId = interaction.user.id;
     await this.checkExistUser(userId);
-    if (!member || !member.voice.channel) {
-      return interaction.reply({
-        content: '❌ Вы должны быть в голосовом канале!',
-        ephemeral: true,
-      });
-    }
+    if (!(await this.checkUserInVoiceChannel([interaction]))) return;
+    if (!member.voice.channel || !member.voice.channel.joinable) return;
+
     if (!interaction.guild) {
       return interaction.reply({
         content: '❌ Не удалось получить информацию о сервере!',
         ephemeral: true,
       });
     }
-
-    console.log(
-      interaction.guild.id,
-      member.voice.channel.id,
-      interaction.guild.voiceAdapterCreator,
-      interaction.user.id,
-      url,
-    );
 
     await this.voiceService.playAudio(
       interaction.guild.id,
@@ -126,53 +115,123 @@ export class DiscordBotService {
 
   @Button('prev')
   public async onPrevButton(@Context() [interaction]: SlashCommandContext) {
-    const guildId = interaction.guildId;
+    await interaction.deferReply({ ephemeral: true });
 
-    if (!guildId) return;
+    try {
+      const guildId = interaction.guildId;
+      const user = interaction.user.username;
+      const member = interaction.member;
+      if (!user || !guildId || !member) return;
 
-    await this.voiceService.prevTrack(guildId, [interaction]);
-    await interaction.reply({ content: 'Bebra' });
+      if (!(await this.checkUserInVoiceChannel([interaction]))) return;
+
+      await this.voiceService.prevTrack(guildId, [interaction]);
+
+      await interaction.editReply({
+        content: `${user} переместился назад`,
+      });
+    } catch {
+      await interaction.editReply({
+        content: '❌ Произошла ошибка при переключении назад!',
+      });
+    }
+
+    setTimeout(() => {
+      interaction.deleteReply().catch(() => {});
+    }, 10000);
   }
 
   @Button('next')
   public async onNextButton(@Context() [interaction]: SlashCommandContext) {
-    const guildId = interaction.guildId;
-    const user = interaction.user.username;
+    await interaction.deferReply({ ephemeral: true });
 
-    if (!user || !guildId) return;
+    try {
+      const guildId = interaction.guildId;
+      const user = interaction.user.username;
+      const member = interaction.member;
+      if (!user || !guildId || !member) return;
 
-    await this.voiceService.nextTrack(guildId, [interaction]);
-    const message = await interaction.reply({
-      content: `${user} пропустил трек`,
-    });
+      if (!(await this.checkUserInVoiceChannel([interaction]))) return;
+
+      await this.voiceService.nextTrack(guildId, [interaction]).finally(() => {
+        interaction
+          .editReply({
+            content: `${user} пропустил трек`,
+          })
+          .catch(() => {});
+      });
+    } catch {
+      await interaction.editReply({
+        content: '❌ Произошла ошибка при переключении вперед!',
+      });
+    }
     setTimeout(() => {
-      message.delete();
-    }, 2000);
+      interaction.deleteReply().catch(() => {});
+    }, 10000);
   }
 
   @Button('resume_pause')
   public async onPauseButton(@Context() [interaction]: SlashCommandContext) {
-    const guildId = interaction.guildId;
-    if (!guildId) return;
-    const player = this.voiceService.getPlayer(guildId);
-    const isPaused = player?.state.status === AudioPlayerStatus.Paused;
-
-    await this.voiceService.togglePause(guildId, [interaction]);
-
     await interaction.deferReply();
-    const message = await interaction.followUp({
-      content: isPaused ? '▶️ Воспроизведение' : '⏸ Пауза',
-    });
+    try {
+      const guildId = interaction.guildId;
+      if (!guildId) return;
+      const player = this.voiceService.getPlayer(guildId);
+      const isPaused = player?.state.status === AudioPlayerStatus.Paused;
+
+      await this.voiceService.togglePause(guildId, [interaction]);
+
+      await interaction.followUp({
+        content: isPaused ? '▶️ Воспроизведение' : '⏸ Пауза',
+      });
+    } catch {
+      await interaction.followUp({
+        content: '❌ Произошла ошибка при переключении вперед!',
+      });
+    }
 
     setTimeout(() => {
-      message.delete();
-    }, 2000);
+      interaction.deleteReply().catch(() => {});
+    }, 10000);
   }
 
   @Button('stopPlay')
   public async onStopButton(@Context() [interaction]: SlashCommandContext) {
-    const guildId = interaction.guildId;
-    if (!guildId) return;
-    await this.voiceService.stop(guildId, [interaction]);
+    await interaction.deferReply({ ephemeral: true });
+
+    try {
+      const guildId = interaction.guildId;
+      const user = interaction.user.username;
+      const member = interaction.member;
+
+      if (!guildId || !user || !member) return;
+
+      if (!(await this.checkUserInVoiceChannel([interaction]))) return;
+      await this.voiceService.stop(guildId, [interaction]);
+
+      await interaction.editReply({
+        content: `${user} велел боту покинуть канал`,
+      });
+    } catch {
+      await interaction.editReply({
+        content: '❌ Произошла ошибка при отключении!',
+      });
+    }
+
+    setTimeout(() => {
+      interaction.deleteReply().catch(() => {});
+    }, 10000);
+  }
+
+  private async checkUserInVoiceChannel([interaction]: SlashCommandContext) {
+    const member = interaction.member as GuildMember;
+    if (!member || !member.voice.channel) {
+      await interaction.reply({
+        content: '❌ Вы должны быть в голосовом канале!',
+        ephemeral: true,
+      });
+      return false;
+    }
+    return true;
   }
 }

@@ -80,8 +80,6 @@ export class VoiceService {
 
     await this.ensurePlaybackStarted(guildId, [interaction]);
 
-    await this.updateMusicMessage(guildId, [interaction]);
-
     this.logger.log('Playback started');
 
     //eslint-disable-next-line
@@ -113,16 +111,12 @@ export class VoiceService {
       const currentItem = queue.items[0];
       const track = await this.resolveTrack(currentItem);
       if (!track || track instanceof NotFoundException) {
-        await this.queueService.nextTrack(guildId);
+        await this.skipProblematicTrack(guildId);
         void (await this.proccesQueue(guildId, [interaction]));
         return;
       }
 
-      const sourceOfTrack = await this.yandexMusicService.getTrackSourceYM(
-        track.trackId,
-      );
-
-      const filepathOfTrack = await this.downloadTrack(sourceOfTrack.source);
+      const filepathOfTrack = await this.downloadTrack(track.trackId);
       this.logger.log(`Track downloaded at ${filepathOfTrack}`);
       const resource = createAudioResource(filepathOfTrack);
       player.play(resource);
@@ -131,6 +125,8 @@ export class VoiceService {
         await this.renderPlayerService.renderMusicMessage(track, queue, [
           interaction,
         ]);
+
+      player.removeAllListeners(AudioPlayerStatus.Idle);
 
       player.once(AudioPlayerStatus.Idle, () => {
         fs.unlink(filepathOfTrack, (err) => err && console.error(err));
@@ -148,7 +144,7 @@ export class VoiceService {
       });
     } catch (e) {
       this.cleanup(guildId);
-      throw new Error(`Queue proccessing Error: ${e}`);
+      this.logger.error(`Error processing queue: ${e}`);
     }
   }
 
@@ -261,40 +257,60 @@ export class VoiceService {
     return null;
   }
 
-  private async downloadTrack(url: string): Promise<string> {
-    try {
-      this.logger.log('Downloading track');
-      const response = await axios.get(url, {
-        responseType: 'arraybuffer',
-        timeout: 30000,
-      });
-      const buffer = Buffer.from(response.data);
-      const dirPath = path.join(__dirname, '..', 'downloads');
-      const filePath = path.join(dirPath, `${Date.now()}.mp3`);
+  private async downloadTrack(trackId: string): Promise<string> {
+    const maxRetries = 10; //todo вынести в константы
+    let retries = 0;
+    const dirPath = path.join(__dirname, '..', 'temp');
 
-      if (!fs.existsSync(dirPath)) fs.mkdirSync(dirPath, { recursive: true });
+    if (!fs.existsSync(dirPath)) {
+      fs.mkdirSync(dirPath);
+    }
 
-      fs.writeFile(filePath, buffer, (err) => {
-        if (err) {
-          console.error('Error writing file', err);
-          throw new Error('Download track error');
+    while (retries < maxRetries) {
+      try {
+        const url = await this.yandexMusicService.getTrackSourceYM(trackId);
+        if (!url || !url.source) {
+          throw new Error('Invalid track source received');
         }
-      });
+        const source = url.source;
+        const filepath = path.join(dirPath, `${Date.now()}-${trackId}.mp3`);
+        this.logger.log(`Download track ${retries + 1}`);
+        const response = await axios.get(source, {
+          responseType: 'arraybuffer',
+          timeout: 30000,
+          validateStatus: (status) => status === 200,
+        });
 
-      return filePath;
+        const buffer = Buffer.from(response.data);
+
+        await fs.promises.writeFile(filepath, buffer);
+
+        return filepath;
+      } catch (e) {
+        retries++;
+        this.logger.error(`Download error retries ${retries}, ${e || ''}`);
+
+        if (retries === maxRetries)
+          throw new Error(
+            `Failed  to downloadTrack after ${maxRetries} attempts`,
+          );
+
+        const delay = Math.pow(2, retries) * 1000;
+        await new Promise((resolve) => setTimeout(resolve, delay));
+        continue;
+      }
+    }
+
+    throw new Error(`Unexpected Error in downloadTrack`);
+  }
+
+  private async skipProblematicTrack(guildId: string) {
+    try {
+      await this.queueService.nextTrack(guildId);
     } catch (e) {
-      console.error('Error download', e);
-      throw new Error('Download track error');
+      this.logger.error(`Failed to skip problematic track: ${e}`);
     }
   }
-
-  cleanup(guildId: string) {
-    this.players.get(guildId)?.stop();
-    this.connections.get(guildId)?.destroy();
-    this.players.delete(guildId);
-    this.connections.delete(guildId);
-  }
-
   private async updateMusicMessage(
     guildId: string,
     [interaction]: SlashCommandContext,
@@ -316,6 +332,13 @@ export class VoiceService {
     );
 
     return;
+  }
+
+  cleanup(guildId: string) {
+    this.players.get(guildId)?.stop();
+    this.connections.get(guildId)?.destroy();
+    this.players.delete(guildId);
+    this.connections.delete(guildId);
   }
 
   public async prevTrack(guildId: string, [interaction]: SlashCommandContext) {
