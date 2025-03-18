@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import { Track } from '@prisma/client';
 import { PrismaService } from 'src/prisma/prisma.service';
 
 @Injectable()
@@ -59,10 +60,19 @@ export class PlaylistService {
 
     if (track) return track;
 
+    const length = (
+      await this.prisma.playlistTrack.findMany({
+        where: {
+          playlistId,
+        },
+      })
+    ).length;
+
     return this.prisma.playlistTrack.create({
       data: {
         playlistId,
         trackId,
+        position: length - 1,
       },
       include: {
         track: true,
@@ -70,29 +80,31 @@ export class PlaylistService {
     });
   }
 
-  async addTracksToPlaylist(playlistId: string, trackIds: string[]) {
-    const existingTracks = await this.prisma.playlistTrack.findMany({
+  async addTracksToPlaylist(playlistId: string, tracks: Track[]) {
+    const trackIds = tracks.map((track) => track.trackId);
+
+    const existingTrack = await this.prisma.playlistTrack.findMany({
       where: {
         playlistId,
         trackId: { in: trackIds },
       },
-      select: { trackId: true },
     });
 
     const existingTrackIds = new Set(
-      existingTracks.map((track) => track.trackId),
+      existingTrack.map((track) => track.trackId),
     );
 
-    const newTracks = trackIds
-      .filter((trackId) => !existingTrackIds.has(trackId))
-      .map((trackId) => ({
+    const newTracks = tracks
+      .map((track, index) => ({
         playlistId,
-        trackId,
-      }));
+        trackId: track.trackId,
+        position: index,
+      }))
+      .filter((track) => !existingTrackIds.has(track.trackId));
 
     if (newTracks.length > 0) {
       await this.prisma.playlistTrack.createMany({
-        data: newTracks,
+        data: { ...newTracks },
       });
     }
 
@@ -101,6 +113,7 @@ export class PlaylistService {
       include: {
         track: true,
       },
+      orderBy: { position: 'asc' },
     });
   }
 }

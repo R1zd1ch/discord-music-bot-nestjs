@@ -29,7 +29,7 @@ export class YandexMusicService {
         return this.getTracksFromAlbumYM(query);
 
       default:
-        throw new Error('Unsupported search format');
+        this.logger.error(`Invalid search query: ${query}`);
     }
   }
 
@@ -66,10 +66,10 @@ export class YandexMusicService {
       })
       .filter((track): track is CreateTrackDto => track !== undefined);
 
-    const addedToDb = await this.tracksService.createTracks(toDtoTracks);
+    await this.tracksService.createTracks(toDtoTracks);
 
     return {
-      tracks: [...(toDtoTracks as Track[])],
+      tracks: { ...(toDtoTracks as Track[]) },
       playlistName: response.title,
     };
   }
@@ -99,7 +99,7 @@ export class YandexMusicService {
       coverUrl: response.coverUri ? this.buildCoverUrl(response.coverUri) : '',
     };
 
-    const addedToDb = await this.tracksService.createTrack(toDtoTrack);
+    await this.tracksService.createTrack(toDtoTrack);
 
     return {
       tracks: [toDtoTrack as Track],
@@ -133,7 +133,7 @@ export class YandexMusicService {
       })
       .filter((track): track is CreateTrackDto => track !== undefined);
 
-    const addedToDb = await this.tracksService.createTracks(toDtoTracks);
+    await this.tracksService.createTracks(toDtoTracks);
 
     return {
       tracks: [...(toDtoTracks as Track[])],
@@ -168,7 +168,7 @@ export class YandexMusicService {
       })
       .filter((track): track is CreateTrackDto => track !== undefined);
 
-    const addedToDb = await this.tracksService.createTracks(toDtoTracks);
+    await this.tracksService.createTracks(toDtoTracks);
     return {
       tracks: [...(toDtoTracks as Track[])],
     };
@@ -187,7 +187,7 @@ export class YandexMusicService {
         }
 
         return { source };
-      } catch (e: any) {
+      } catch (e: unknown) {
         retries++;
         this.logger.error(`Yandex Music API error (attempt ${retries}): ${e}`);
 

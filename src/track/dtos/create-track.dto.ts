@@ -1,4 +1,4 @@
-import { IsNotEmpty, IsOptional, IsString } from 'class-validator';
+import { IsNotEmpty, IsNumber, IsOptional, IsString } from 'class-validator';
 export class CreateTrackDto {
   @IsString()
   @IsNotEmpty()
@@ -23,4 +23,8 @@ export class CreateTrackDto {
   @IsString()
   @IsNotEmpty()
   coverUrl: string;
+
+  @IsNumber()
+  @IsOptional()
+  position?: number;
 }

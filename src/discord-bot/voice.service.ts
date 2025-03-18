@@ -68,8 +68,16 @@ export class VoiceService {
     let message: any;
 
     if (response.tracks.length > 1) {
-      if ('playlistName' in response && response.playlistName && userId) {
-        await this.handlePlaylist(guildId, userId, response);
+      if (
+        'playlistName' in response &&
+        response.playlistName &&
+        userId &&
+        response.tracks
+      ) {
+        await this.handlePlaylist(guildId, userId, {
+          ...response,
+          playlistName: response.playlistName as string,
+        });
       } else {
         await this.handleTracks(guildId, trackIds);
       }
@@ -183,7 +191,10 @@ export class VoiceService {
   private async handlePlaylist(
     guildId: string,
     userId: string,
-    searchResult: any,
+    searchResult: {
+      playlistName?: string;
+      tracks: Track[];
+    },
   ) {
     //eslint-disable-next-line
     const trackIds = searchResult.tracks.map(
@@ -191,6 +202,7 @@ export class VoiceService {
     ) as string[];
     //eslint-disable-next-line
     const playlistName = searchResult.playlistName as string;
+    const tracks = searchResult.tracks;
     const existingPlaylist = await this.playlistService.findByName(
       userId,
       playlistName,
@@ -199,7 +211,8 @@ export class VoiceService {
     if (existingPlaylist) {
       await this.playlistService.addTracksToPlaylist(
         existingPlaylist.id,
-        trackIds,
+
+        tracks,
       );
       await this.queueService.addPlaylistToQueue(guildId, existingPlaylist.id);
       return;
@@ -212,7 +225,11 @@ export class VoiceService {
       playlistName,
     );
 
-    await this.playlistService.addTracksToPlaylist(newPlayList.id, trackIds);
+    await this.playlistService.addTracksToPlaylist(
+      newPlayList.id,
+
+      tracks,
+    );
 
     await this.queueService.addPlaylistToQueue(guildId, newPlayList.id);
   }

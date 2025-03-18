@@ -37,6 +37,7 @@ model PlaylistTrack {
   playlist   Playlist @relation(fields: [playlistId], references: [id], onDelete: Cascade)
   track      Track    @relation(fields: [trackId], references: [trackId])
   trackId    String
+  position   Int
 
   createdAt DateTime @default(now())
 }
