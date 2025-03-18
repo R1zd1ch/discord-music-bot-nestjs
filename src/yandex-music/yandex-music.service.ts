@@ -66,10 +66,15 @@ export class YandexMusicService {
       })
       .filter((track): track is CreateTrackDto => track !== undefined);
 
-    await this.tracksService.createTracks(toDtoTracks);
+    const added = await this.tracksService
+      .createTracks(toDtoTracks)
+      .then(() => {
+        this.logger.debug('created tracks from playlist');
+      });
 
+    this.logger.debug('returned music');
     return {
-      tracks: { ...(toDtoTracks as Track[]) },
+      tracks: [...(toDtoTracks as Track[])],
       playlistName: response.title,
     };
   }

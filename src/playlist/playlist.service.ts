@@ -1,10 +1,12 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { Track } from '@prisma/client';
 import { PrismaService } from 'src/prisma/prisma.service';
 
 @Injectable()
 export class PlaylistService {
   constructor(private readonly prisma: PrismaService) {}
+
+  private readonly logger = new Logger(PlaylistService.name);
 
   async createPlaylist(userId: string, name: string) {
     return this.prisma.playlist.create({
@@ -40,14 +42,17 @@ export class PlaylistService {
   }
 
   async getTracksFromPlaylist(playlistId: string) {
-    return this.prisma.playlistTrack.findMany({
+    const tracks = await this.prisma.playlistTrack.findMany({
       where: {
         playlistId,
       },
       include: {
         track: true,
       },
+      orderBy: { position: 'asc' },
     });
+
+    return tracks.filter((t) => !!t.track);
   }
 
   async addTrackToPlaylist(playlistId: string, trackId: string) {
@@ -81,39 +86,51 @@ export class PlaylistService {
   }
 
   async addTracksToPlaylist(playlistId: string, tracks: Track[]) {
+    this.logger.debug('adding tracks to playlist');
     const trackIds = tracks.map((track) => track.trackId);
 
-    const existingTrack = await this.prisma.playlistTrack.findMany({
-      where: {
-        playlistId,
-        trackId: { in: trackIds },
-      },
+    // Получаем существующие треки
+    const existingTracks = await this.prisma.playlistTrack.findMany({
+      where: { playlistId, trackId: { in: trackIds } },
     });
 
-    const existingTrackIds = new Set(
-      existingTrack.map((track) => track.trackId),
+    // Фильтруем только новые треки
+    const existingTrackIds = new Set(existingTracks.map((t) => t.trackId));
+    const newTracks = tracks.filter(
+      (track) => !existingTrackIds.has(track.trackId),
     );
 
-    const newTracks = tracks
-      .map((track, index) => ({
-        playlistId,
-        trackId: track.trackId,
-        position: index,
-      }))
-      .filter((track) => !existingTrackIds.has(track.trackId));
-
-    if (newTracks.length > 0) {
-      await this.prisma.playlistTrack.createMany({
-        data: { ...newTracks },
+    if (newTracks.length === 0) {
+      return this.prisma.playlistTrack.findMany({
+        where: { playlistId },
+        include: { track: true },
+        orderBy: { position: 'asc' },
       });
     }
 
-    return this.prisma.playlistTrack.findMany({
-      where: { playlistId },
-      include: {
-        track: true,
-      },
-      orderBy: { position: 'asc' },
+    // Используем транзакцию для атомарности операций
+    return this.prisma.$transaction(async (prisma) => {
+      // Сдвигаем все существующие позиции вниз
+      await prisma.playlistTrack.updateMany({
+        where: { playlistId },
+        data: { position: { increment: newTracks.length } },
+      });
+
+      // Добавляем новые треки в начало
+      await prisma.playlistTrack.createMany({
+        data: newTracks.map((track, index) => ({
+          playlistId,
+          trackId: track.trackId,
+          position: index,
+        })),
+        skipDuplicates: true,
+      });
+
+      return prisma.playlistTrack.findMany({
+        where: { playlistId },
+        include: { track: true },
+        orderBy: { position: 'asc' },
+      });
     });
   }
 }

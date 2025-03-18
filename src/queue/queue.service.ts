@@ -22,6 +22,7 @@ export class QueueService {
                   include: {
                     track: true,
                   },
+                  orderBy: { position: 'asc' },
                 },
               },
             },
@@ -129,7 +130,7 @@ export class QueueService {
       },
     });
 
-    return this.prisma.queueItem.create({
+    const response = await this.prisma.queueItem.create({
       data: {
         queueId: queue.id,
         playlistId,
@@ -138,21 +139,28 @@ export class QueueService {
         currentIndex: 0,
       },
     });
+
+    return response;
   }
 
   async nextTrack(guildId: string) {
     const queue = await this.getQueue(guildId);
     if (!queue || queue.items.length === 0) return;
 
-    const currentTrack = queue.items[0];
+    const currentItem = queue.items[0];
 
-    if (currentTrack.type === QueueItemType.PLAYLIST && currentTrack.playlist) {
-      const playlistTracks = currentTrack.playlist.tracks;
+    if (currentItem.type === QueueItemType.PLAYLIST && currentItem.playlist) {
+      const playlistTracks = currentItem.playlist.tracks;
+      const newIndex = (currentItem.currentIndex ?? 0) + 1;
 
-      if (currentTrack.currentIndex < playlistTracks.length - 1) {
-        await this.prisma.queueItem.update({
-          where: { id: currentTrack.id },
-          data: { currentIndex: currentTrack.currentIndex + 1 },
+      if (newIndex < playlistTracks.length) {
+        return await this.prisma.queueItem.update({
+          where: { id: currentItem.id },
+          data: { currentIndex: newIndex },
+        });
+      } else {
+        await this.prisma.queueItem.delete({
+          where: { id: currentItem.id },
         });
         return this.getQueue(guildId);
       }

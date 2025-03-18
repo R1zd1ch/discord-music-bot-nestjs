@@ -18,6 +18,11 @@ export class PlayerService {
   ) {
     /* eslint-disable */
 
+    if (!currentTrack) {
+      this.logger.error('Current track is undefined');
+      return;
+    }
+
     const queueItems = queue.items;
     const queueTracks = queueItems.filter(
       (item) => item.type === QueueItemType.TRACK,
@@ -51,6 +56,10 @@ export class PlayerService {
       } else {
         nextTrack = queueTracks[0].track || null;
       }
+    }
+
+    if (nextTrack && !nextTrack.title) {
+      nextTrack = null;
     }
 
     const embed = new EmbedBuilder()

@@ -55,6 +55,7 @@ export class VoiceService {
     await this.ensureVoiceConnection(guildId, channelId, adapterCreator);
 
     const response = await this.yandexMusicService.searchYM(url);
+    this.logger.warn(`response: ${response?.tracks?.length}`);
 
     if (
       !response ||
@@ -67,13 +68,11 @@ export class VoiceService {
 
     let message: any;
 
+    this.logger.debug(`tracks founded ${trackIds.length}`);
+
     if (response.tracks.length > 1) {
-      if (
-        'playlistName' in response &&
-        response.playlistName &&
-        userId &&
-        response.tracks
-      ) {
+      if ('playlistName' in response && response.playlistName && userId) {
+        this.logger.debug('choose playlist');
         await this.handlePlaylist(guildId, userId, {
           ...response,
           playlistName: response.playlistName as string,
@@ -110,6 +109,7 @@ export class VoiceService {
 
       if (!player) return;
       const queue = await this.queueService.getQueue(guildId);
+      console.log('queue', queue?.items);
 
       this.logger.log(`queue tracks ${queue?.items?.length}`);
 
@@ -130,6 +130,7 @@ export class VoiceService {
       this.logger.log(`Track downloaded at ${filepathOfTrack}`);
       const resource = createAudioResource(filepathOfTrack);
       player.play(resource);
+      console.log(track);
 
       if (track)
         await this.renderPlayerService.renderMusicMessage(track, queue, [
@@ -197,12 +198,16 @@ export class VoiceService {
     },
   ) {
     //eslint-disable-next-line
-    const trackIds = searchResult.tracks.map(
-      (t: Track) => t.trackId,
-    ) as string[];
-    //eslint-disable-next-line
+
+    this.logger.debug('handling playlist');
     const playlistName = searchResult.playlistName as string;
     const tracks = searchResult.tracks;
+
+    if (tracks.length === 0) {
+      this.logger.warn('Attempted to add empty playlist');
+      return;
+    }
+
     const existingPlaylist = await this.playlistService.findByName(
       userId,
       playlistName,
@@ -211,9 +216,9 @@ export class VoiceService {
     if (existingPlaylist) {
       await this.playlistService.addTracksToPlaylist(
         existingPlaylist.id,
-
         tracks,
       );
+      console.log('existingPlaylist', existingPlaylist);
       await this.queueService.addPlaylistToQueue(guildId, existingPlaylist.id);
       return;
     }
@@ -225,11 +230,9 @@ export class VoiceService {
       playlistName,
     );
 
-    await this.playlistService.addTracksToPlaylist(
-      newPlayList.id,
+    console.log('new playlist', newPlayList);
 
-      tracks,
-    );
+    await this.playlistService.addTracksToPlaylist(newPlayList.id, tracks);
 
     await this.queueService.addPlaylistToQueue(guildId, newPlayList.id);
   }
@@ -271,8 +274,19 @@ export class VoiceService {
       );
       this.logger.log(`${playlist[0].id} ${item.currentIndex}`);
 
-      if (item.currentIndex < playlist.length) {
+      if (!playlist?.length || item.currentIndex >= playlist.length) {
+        this.logger.warn(
+          `Invalid playlist index, removing playlist from queue`,
+        );
+        return null;
+      }
+
+      if (item.currentIndex >= 0 && item.currentIndex < playlist.length) {
         const track = playlist[item.currentIndex];
+
+        if (track.track instanceof NotFoundException) {
+          return null;
+        }
 
         return track.track;
       }
@@ -399,7 +413,9 @@ export class VoiceService {
 
   public async prevTrack(guildId: string, [interaction]: SlashCommandContext) {
     await this.queueService.prevTrack(guildId).finally(() => {
-      this.proccesQueue(guildId, [interaction]);
+      this.proccesQueue(guildId, [interaction]).catch(() => {
+        this.logger.error(`Failed to process queue after prevTrack`);
+      });
     });
 
     await this.updateMusicMessage(guildId, [interaction]);
@@ -407,7 +423,9 @@ export class VoiceService {
 
   public async nextTrack(guildId: string, [interaction]: SlashCommandContext) {
     await this.queueService.nextTrack(guildId).finally(() => {
-      this.proccesQueue(guildId, [interaction]);
+      this.proccesQueue(guildId, [interaction]).catch(() => {
+        this.logger.error(`Failed to process queue after prevTrack`);
+      });
     });
 
     await this.updateMusicMessage(guildId, [interaction]);
