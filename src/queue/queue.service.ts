@@ -50,11 +50,12 @@ export class QueueService {
       });
     }
 
-    const currentPosition = await this.prisma.queueItem.count({
-      where: {
-        queueId: queue.id,
-      },
-    });
+    const currentPosition =
+      (await this.prisma.queueItem.count({
+        where: {
+          queueId: queue.id,
+        },
+      })) + 1;
 
     const queueItems = trackIds.map((trackId, index) => ({
       queueId: queue.id,
