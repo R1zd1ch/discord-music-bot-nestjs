@@ -1,5 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { LoopMode, QueueItemType } from '@prisma/client';
+import { LoopMode, QueueItem, QueueItemType } from '@prisma/client';
 import { PrismaService } from 'src/prisma/prisma.service';
 
 @Injectable()
@@ -79,11 +79,12 @@ export class QueueService {
       queue = await this.prisma.queue.create({ data: { guildId } });
     }
 
-    const position = await this.prisma.queueItem.count({
-      where: {
-        queueId: queue.id,
-      },
-    });
+    const position =
+      (await this.prisma.queueItem.count({
+        where: {
+          queueId: queue.id,
+        },
+      })) + 1;
 
     const response = await this.prisma.queueItem.create({
       data: {
@@ -102,28 +103,53 @@ export class QueueService {
     const queue = await this.getQueue(guildId);
     if (!queue || queue.items.length === 0) return;
 
-    const currentItem = queue.items[0];
+    const currentItem = this.getCurrentItem(queue);
+    let newPosition = queue.currentPosition;
 
+    if (!currentItem) return;
+    //eslint-disable-next-line
+    //@ts-ignore
+    //eslint-disable-next-line
     if (currentItem.type === QueueItemType.PLAYLIST && currentItem.playlist) {
+      //eslint-disable-next-line
+      //@ts-ignore
+      //eslint-disable-next-line
       const playlistTracks = currentItem.playlist.tracks;
       const newIndex = (currentItem.currentIndex ?? 0) + 1;
-
+      //eslint-disable-next-line
       if (newIndex < playlistTracks.length) {
         return await this.prisma.queueItem.update({
           where: { id: currentItem.id },
           data: { currentIndex: newIndex },
         });
-      } else {
-        await this.prisma.queueItem.delete({
-          where: { id: currentItem.id },
-        });
-        return this.getQueue(guildId);
+        return;
       }
     }
 
     this.logger.log(`currentPosition: ${queue.currentPosition}`);
 
     if (queue.currentPosition < queue.items.length - 1) {
+      newPosition = queue.currentPosition + 1;
+    }
+
+    await this.prisma.queue.update({
+      where: { guildId },
+      data: { currentPosition: newPosition },
+    });
+    return;
+  }
+
+  async nextItem(guildId: string) {
+    const queue = await this.getQueue(guildId);
+
+    if (!queue || queue.items.length === 0) return;
+
+    this.logger.debug(
+      `currentPosition: ${queue.currentPosition} length: ${queue.items.length}`,
+    );
+
+    if (queue.currentPosition < queue.items.length - 1) {
+      this.logger.debug(`skiping element`);
       await this.prisma.queue.update({
         where: {
           guildId,
@@ -137,58 +163,38 @@ export class QueueService {
     return this.getQueue(guildId);
   }
 
-  async nextItem(guildId: string) {
-    const queue = await this.getQueue(guildId);
-
-    if (!queue || queue.items.length === 0) return;
-
-    if (queue.currentPosition < queue.items.length - 1) {
-      await this.prisma.queue.update({
-        where: {
-          guildId,
-        },
-        data: {
-          currentPosition: { increment: queue.currentPosition },
-        },
-      });
-    }
-
-    return this.getQueue(guildId);
-  }
-
   async prevTrack(guildId: string) {
     const queue = await this.getQueue(guildId);
     if (!queue || queue.items.length === 0) return;
 
-    const currentTrack = queue.items[0];
+    let newPosition = queue.currentPosition;
+    const currentItem = this.getCurrentItem(queue);
 
-    if (currentTrack.type === QueueItemType.PLAYLIST && currentTrack.playlist) {
-      if (currentTrack.currentIndex > 0) {
+    if (!currentItem) return;
+
+    //eslint-disable-next-line
+    //@ts-ignore
+    //eslint-disable-next-line
+    if (currentItem?.type === QueueItemType.PLAYLIST) {
+      if ((currentItem.currentIndex ?? 0) > 0) {
+        // Возврат внутри плейлиста
         await this.prisma.queueItem.update({
-          where: {
-            id: currentTrack.id,
-          },
-          data: {
-            currentIndex: currentTrack.currentIndex - 1,
-          },
+          where: { id: currentItem.id },
+          data: { currentIndex: { decrement: 1 } },
         });
-        return this.getQueue(guildId);
+        return;
       }
     }
 
     if (queue.currentPosition > 0) {
-      await this.prisma.queue.update({
-        where: { guildId },
-        data: { currentPosition: { decrement: 1 } },
-      });
-    } else {
-      await this.prisma.queue.update({
-        where: { guildId },
-        data: { currentPosition: queue.items.length - 1 },
-      });
+      newPosition = queue.currentPosition - 1;
     }
 
-    return this.getQueue(guildId);
+    await this.prisma.queue.update({
+      where: { guildId },
+      data: { currentPosition: newPosition },
+    });
+    return;
   }
 
   async updatePlayerMessageId(guildId: string, messageId: string) {
@@ -268,5 +274,12 @@ export class QueueService {
         id: queueItem.id,
       },
     });
+  }
+
+  getCurrentItem(queue: any): QueueItem | null {
+    //eslint-disable-next-line
+    if (queue.currentPosition >= queue.items.length) return null;
+    //eslint-disable-next-line
+    return queue.items[queue.currentPosition];
   }
 }

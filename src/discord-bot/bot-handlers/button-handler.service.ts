@@ -243,13 +243,14 @@ export class ButtonHandlerService {
         .finally(() => {
           interaction
             .editReply({
-              content: `${username} пропустил трек`,
+              content: `${username} пропустил элемент очереди`,
             })
             .catch(() => {});
         });
     } catch {
       await interaction.editReply({
-        content: '❌ Произошла ошибка при обработке команды пропуска трека',
+        content:
+          '❌ Произошла ошибка при обработке команды пропуска элемента очереди',
       });
     }
 

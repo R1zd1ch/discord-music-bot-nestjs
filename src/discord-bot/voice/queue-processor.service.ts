@@ -35,7 +35,7 @@ export class QueueProcessorService {
       return;
     }
     //eslint-disable-next-line
-    const currentItem = queue.items[0];
+    const currentItem = queue.items[queue.currentPosition];
     const track = await this.trackResolver.resolveTrack(
       currentItem as QueueItem,
     );

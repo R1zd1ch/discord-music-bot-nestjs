@@ -37,7 +37,10 @@ export class PlayerService {
       );
 
       // eslint-disable-next-line
-      const nextTrack = this.getNextTrack(queueItems as QueueItem[]);
+      const nextTrack = this.getNextTrack(
+        queueItems as QueueItem[],
+        queue.currentPosition,
+      );
       const embed = this.buildEmbed(
         currentTrack,
         remainingTracks,
@@ -79,7 +82,7 @@ export class PlayerService {
     // const tracksCount =
     //   tracks.length + playlists.length - playlistsCount - currentPosition - 1;
 
-    const tracksCount = tracks.length;
+    const tracksCount = tracks.length + playlists.length - currentPosition - 1;
 
     return tracksCount + playlistsCount;
   }
@@ -118,12 +121,14 @@ export class PlayerService {
     }
   }
 
-  private getNextTrack(items: QueueItem[]) {
+  private getNextTrack(items: QueueItem[], currentIndex: number = 0) {
     this.logger.debug('getting next track');
     if (items.length === 0) return null;
     this.logger.debug('not null');
 
-    const firstItem = items[0];
+    const firstItem = items[currentIndex];
+    const nextItem = items[currentIndex + 1] ?? null;
+
     if (firstItem.type === QueueItemType.PLAYLIST) {
       const currentIndex = firstItem.currentIndex ?? 0;
       // eslint-disable-next-line
@@ -133,11 +138,16 @@ export class PlayerService {
     }
 
     //todo доделать для 2 треков
-
+    if (nextItem !== null && nextItem.type === QueueItemType.PLAYLIST) {
+      // eslint-disable-next-line
+      //@ts-ignore
+      // eslint-disable-next-line
+      return nextItem?.playlist?.tracks[0]?.track ?? null;
+    }
     //eslint-disable-next-line
     //@ts-ignore
     // eslint-disable-next-line
-    return firstItem.track ?? null;
+    return nextItem?.track ?? null;
   }
 
   private buildEmbed(
@@ -176,7 +186,7 @@ export class PlayerService {
     }
     // eslint-disable-next-line
     //@ts-ignore
-    if (nextTrack || (nextTrack && nextTrack?.title)) {
+    if (nextTrack && nextTrack?.title) {
       embed.addFields(
         { name: '\u200B', value: '\u200B' },
         { name: '⏭ Следующий трек', value: nextTrack.title, inline: true },
