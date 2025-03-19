@@ -29,7 +29,7 @@ export class TrackService {
       },
     });
 
-    if (!track) return new NotFoundException('Not found track');
+    if (!track) return null;
 
     return track;
   }

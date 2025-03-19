@@ -1,9 +1,10 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { LoopMode, QueueItemType } from '@prisma/client';
 import { PrismaService } from 'src/prisma/prisma.service';
 
 @Injectable()
 export class QueueService {
+  private readonly logger = new Logger(QueueService.name);
   constructor(private readonly prisma: PrismaService) {}
 
   async getQueue(guildId: string) {
@@ -32,52 +33,6 @@ export class QueueService {
     });
 
     return queue;
-  }
-
-  async getQueueLength(guildId: string) {
-    const queue = await this.prisma.queue.findFirst({
-      where: {
-        guildId,
-      },
-    });
-
-    if (!queue) {
-      return 0;
-    }
-  }
-  async addTrackToQueue(guildId: string, trackId: string) {
-    let queue = await this.prisma.queue.findFirst({
-      where: {
-        guildId,
-      },
-    });
-
-    if (!queue) {
-      queue = await this.prisma.queue.create({ data: { guildId } });
-    }
-
-    const track = await this.prisma.track.findUnique({
-      where: { trackId },
-    });
-
-    if (!track) {
-      throw new Error(`Track ${trackId} not found in database`);
-    }
-
-    const position = await this.prisma.queueItem.count({
-      where: {
-        queueId: queue.id,
-      },
-    });
-
-    return this.prisma.queueItem.create({
-      data: {
-        queueId: queue.id,
-        trackId: trackId,
-        type: QueueItemType.TRACK,
-        position,
-      },
-    });
   }
 
   async addTracksToQueue(guildId: string, trackIds: string[]) {
@@ -166,12 +121,7 @@ export class QueueService {
       }
     }
 
-    // await this.prisma.$transaction(async (prisma) => {
-    //   await prisma.queueItem.update({
-    //     where: { id: queue.items[0].id },
-    //     data: { position: queue.items[queue.items.length - 1].position + 1 },
-    //   });
-    // });
+    this.logger.log(`currentPosition: ${queue.currentPosition}`);
 
     if (queue.currentPosition < queue.items.length - 1) {
       await this.prisma.queue.update({
@@ -198,7 +148,7 @@ export class QueueService {
           guildId,
         },
         data: {
-          currentPosition: queue.currentPosition + 1,
+          currentPosition: { increment: queue.currentPosition },
         },
       });
     }
@@ -226,13 +176,6 @@ export class QueueService {
       }
     }
 
-    // await this.prisma.$transaction(async (prisma) => {
-    //   await prisma.queueItem.update({
-    //     where: { id: queue.items[queue.items.length - 1].id },
-    //     data: { position: queue.items[0].position - 1 },
-    //   });
-    // });
-
     if (queue.currentPosition > 0) {
       await this.prisma.queue.update({
         where: { guildId },
@@ -248,25 +191,6 @@ export class QueueService {
     return this.getQueue(guildId);
   }
 
-  async removeTrackFromQueue(trackId: string, guildId: string) {
-    const queueItem = await this.prisma.queueItem.findFirst({
-      where: {
-        trackId,
-        queue: {
-          guildId,
-        },
-      },
-    });
-
-    if (!queueItem) return null;
-
-    return this.prisma.queueItem.delete({
-      where: {
-        id: queueItem.id,
-      },
-    });
-  }
-
   async updatePlayerMessageId(guildId: string, messageId: string) {
     return this.prisma.queue.update({
       where: {
@@ -276,20 +200,6 @@ export class QueueService {
         playerMessageId: messageId,
       },
     });
-  }
-
-  async getPlayerMessageId(guildId: string) {
-    const queue = await this.prisma.queue.findFirst({
-      where: {
-        guildId,
-      },
-      select: {
-        playerMessageId: true,
-      },
-    });
-    console.log(queue);
-
-    return queue;
   }
 
   async setLoopMode(guildId: string) {
@@ -342,5 +252,21 @@ export class QueueService {
           },
         }),
       );
+  }
+
+  async removeItemFromQueue(itemId: string) {
+    const queueItem = await this.prisma.queueItem.findFirst({
+      where: {
+        id: itemId,
+      },
+    });
+
+    if (!queueItem) return null;
+
+    return this.prisma.queueItem.delete({
+      where: {
+        id: queueItem.id,
+      },
+    });
   }
 }

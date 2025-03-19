@@ -12,7 +12,7 @@ export default function buttonsComponents(isPaused: boolean) {
         .setLabel(`${isPaused ? '▶️' : '⏸️'}`)
         .setStyle(isPaused ? ButtonStyle.Primary : ButtonStyle.Secondary),
       new ButtonBuilder()
-        .setCustomId('stopPlay')
+        .setCustomId('stop')
         .setLabel('⏹️')
         .setStyle(ButtonStyle.Danger),
       new ButtonBuilder()

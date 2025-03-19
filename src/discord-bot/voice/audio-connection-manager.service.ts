@@ -8,6 +8,7 @@ import {
   VoiceConnectionStatus,
 } from '@discordjs/voice';
 import { Injectable, Logger } from '@nestjs/common';
+import { QueueService } from 'src/queue/queue.service';
 
 @Injectable()
 export class AudioConnectionManagerService {
@@ -15,24 +16,34 @@ export class AudioConnectionManagerService {
   private players: Map<string, AudioPlayer> = new Map();
   private logger: Logger = new Logger(AudioConnectionManagerService.name);
 
+  constructor(private readonly queueService: QueueService) {}
+
   public async createConnection(
     guildId: string,
     channelId: string,
     adapterCreator: DiscordGatewayAdapterCreator,
   ) {
-    const connection = joinVoiceChannel({
-      channelId,
-      guildId,
-      adapterCreator,
-    });
+    let connection = this.getConnection(guildId);
+    let player = this.getPlayer(guildId);
+    if (!connection) {
+      this.logger.debug(
+        `Joining voice channel ${channelId} in guild ${guildId}`,
+      );
+      connection = joinVoiceChannel({
+        channelId,
+        guildId,
+        adapterCreator,
+      });
+      this.connections.set(guildId, connection);
+      await this.queueService.clearQueue(guildId);
+    }
 
+    if (!player) {
+      player = createAudioPlayer();
+      connection.subscribe(player);
+      this.players.set(guildId, player);
+    }
     await entersState(connection, VoiceConnectionStatus.Ready, 15_000);
-    this.connections.set(guildId, connection);
-
-    const player = createAudioPlayer();
-    connection.subscribe(player);
-
-    this.players.set(guildId, player);
 
     return { connection, player };
   }
