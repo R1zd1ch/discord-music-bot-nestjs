@@ -53,44 +53,6 @@ export class ButtonHandlerService {
     }, this.TIME_TO_DELETE_MESSAGE);
   }
 
-  @Button('next')
-  public async next(@Context() [interaction]: SlashCommandContext) {
-    await interaction.deferReply({ ephemeral: true });
-
-    try {
-      const guildId = interaction.guildId;
-      const username = interaction.user.username;
-      const member = interaction.member as GuildMember;
-
-      if (!(await this.checkUserInVoiceChannel([interaction]))) return;
-
-      if (!guildId || !username || !member) {
-        await interaction.editReply({
-          content: '❌ Произошла ошибка при обработке команды',
-        });
-        return;
-      }
-
-      await this.voiceService
-        .handleControl(guildId, 'next', [interaction])
-        .finally(() => {
-          interaction
-            .editReply({
-              content: `${username} переместился вперед`,
-            })
-            .catch(() => {});
-        });
-    } catch {
-      await interaction.editReply({
-        content: '❌ Произошла ошибка при обработке команды следующего трека',
-      });
-    }
-
-    setTimeout(() => {
-      interaction.deleteReply().catch(() => {});
-    }, this.TIME_TO_DELETE_MESSAGE);
-  }
-
   @Button('resume_pause')
   public async resumePause(@Context() [interaction]: SlashCommandContext) {
     await interaction.deferReply({});
@@ -152,10 +114,11 @@ export class ButtonHandlerService {
       const guildId = interaction.guildId;
       const username = interaction.user.username;
       const member = interaction.member;
+      const channelId = interaction.channelId;
 
       if (!(await this.checkUserInVoiceChannel([interaction]))) return;
 
-      if (!guildId || !username || !member) {
+      if (!guildId || !username || !member || !channelId) {
         await interaction.editReply({
           content: '❌ Произошла ошибка при обработке команды',
         });
@@ -175,6 +138,83 @@ export class ButtonHandlerService {
       await interaction.editReply({
         content:
           '❌ Произошла ошибка при обработке команды остановки воспроизведения',
+      });
+    }
+
+    setTimeout(() => {
+      interaction.deleteReply().catch(() => {});
+    }, this.TIME_TO_DELETE_MESSAGE);
+  }
+
+  @Button('next')
+  public async next(@Context() [interaction]: SlashCommandContext) {
+    await interaction.deferReply({ ephemeral: true });
+
+    try {
+      const guildId = interaction.guildId;
+      const username = interaction.user.username;
+      const member = interaction.member as GuildMember;
+
+      if (!(await this.checkUserInVoiceChannel([interaction]))) return;
+
+      if (!guildId || !username || !member) {
+        await interaction.editReply({
+          content: '❌ Произошла ошибка при обработке команды',
+        });
+        return;
+      }
+
+      await this.voiceService
+        .handleControl(guildId, 'next', [interaction])
+        .finally(() => {
+          interaction
+            .editReply({
+              content: `${username} переместился вперед`,
+            })
+            .catch(() => {});
+        });
+    } catch {
+      await interaction.editReply({
+        content: '❌ Произошла ошибка при обработке команды следующего трека',
+      });
+    }
+
+    setTimeout(() => {
+      interaction.deleteReply().catch(() => {});
+    }, this.TIME_TO_DELETE_MESSAGE);
+  }
+
+  @Button('skipItem')
+  public async skipItem(@Context() [interaction]: SlashCommandContext) {
+    await interaction.deferReply({ ephemeral: true });
+
+    try {
+      const guildId = interaction.guildId;
+      const username = interaction.user.username;
+      const member = interaction.member;
+
+      if (!(await this.checkUserInVoiceChannel([interaction]))) return;
+
+      if (!guildId || !username || !member) {
+        await interaction.editReply({
+          content: '❌ Произошла ошибка при обработке команды',
+        });
+        return;
+      }
+
+      await this.voiceService
+        .handleControl(guildId, 'skipItem', [interaction])
+        .finally(() => {
+          interaction
+            .editReply({
+              content: `${username} пропустил элемент очереди`,
+            })
+            .catch(() => {});
+        });
+    } catch {
+      await interaction.editReply({
+        content:
+          '❌ Произошла ошибка при обработке команды пропуска элемента очереди',
       });
     }
 
@@ -221,8 +261,8 @@ export class ButtonHandlerService {
     }, this.TIME_TO_DELETE_MESSAGE);
   }
 
-  @Button('skipItem')
-  public async skipItem(@Context() [interaction]: SlashCommandContext) {
+  @Button('shuffle')
+  public async shuffle(@Context() [interaction]: SlashCommandContext) {
     await interaction.deferReply({ ephemeral: true });
 
     try {
@@ -240,24 +280,19 @@ export class ButtonHandlerService {
       }
 
       await this.voiceService
-        .handleControl(guildId, 'skipItem', [interaction])
+        .handleControl(guildId, 'shuffle', [interaction])
         .finally(() => {
           interaction
             .editReply({
-              content: `${username} пропустил элемент очереди`,
+              content: `${username} перемешал очередь`,
             })
             .catch(() => {});
         });
     } catch {
       await interaction.editReply({
-        content:
-          '❌ Произошла ошибка при обработке команды пропуска элемента очереди',
+        content: '❌ Произошла ошибка при обработке команды перемешивания',
       });
     }
-
-    setTimeout(() => {
-      interaction.deleteReply().catch(() => {});
-    }, this.TIME_TO_DELETE_MESSAGE);
   }
 
   @Button('volume')

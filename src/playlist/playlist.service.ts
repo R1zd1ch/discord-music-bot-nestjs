@@ -77,7 +77,8 @@ export class PlaylistService {
       data: {
         playlistId,
         trackId,
-        position: length - 1,
+        position: length,
+        originalPosition: length,
       },
       include: {
         track: true,
@@ -87,51 +88,56 @@ export class PlaylistService {
 
   async addTracksToPlaylist(playlistId: string, tracks: Track[]) {
     this.logger.debug('adding tracks to playlist');
-    const trackIds = tracks.map((track) => track.trackId);
-    // console.log(tracks);
+    const needsRestore = await this.checkPlaylistOrder(playlistId);
 
-    // Получаем существующие треки
-    const existingTracks = await this.prisma.playlistTrack.findMany({
-      where: { playlistId, trackId: { in: trackIds } },
+    if (needsRestore) {
+      await this.restorePlaylistOrder(playlistId);
+    }
+
+    const trackIds = new Set(tracks.map((track) => track.trackId));
+
+    const allTracksFromPlaylist = await this.prisma.playlistTrack.findMany({
+      where: { playlistId },
+      orderBy: { originalPosition: 'asc' },
     });
 
-    // Фильтруем только новые треки
-    const existingTrackIds = new Set(existingTracks.map((t) => t.trackId));
+    const tracksToDelete = allTracksFromPlaylist.filter(
+      (track) => !trackIds.has(track.trackId),
+    );
+
+    const existingTrackIds = new Set(
+      allTracksFromPlaylist.map((t) => t.trackId),
+    );
     const newTracks = tracks.filter(
       (track) => !existingTrackIds.has(track.trackId),
     );
 
-    // const deletedTracks = existingTracks.filter(
-    //   (track) => !trackIds.includes(track.trackId),
-    // );
-
-    // console.log(deletedTracks);
-
-    if (newTracks.length === 0) {
-      return this.prisma.playlistTrack.findMany({
-        where: { playlistId },
-        include: { track: true },
-        orderBy: { position: 'asc' },
-      });
-    }
-
-    // Используем транзакцию для атомарности операций
     return this.prisma.$transaction(async (prisma) => {
-      // Сдвигаем все существующие позиции вниз
-      await prisma.playlistTrack.updateMany({
-        where: { playlistId },
-        data: { position: { increment: newTracks.length } },
-      });
+      if (tracksToDelete.length > 0) {
+        await prisma.playlistTrack.deleteMany({
+          where: {
+            playlistId,
+            trackId: { in: tracksToDelete.map((t) => t.trackId) },
+          },
+        });
+      }
 
-      // Добавляем новые треки в начало
-      await prisma.playlistTrack.createMany({
-        data: newTracks.map((track, index) => ({
-          playlistId,
-          trackId: track.trackId,
-          position: index,
-        })),
-        skipDuplicates: true,
-      });
+      if (newTracks.length > 0) {
+        await prisma.playlistTrack.updateMany({
+          where: { playlistId },
+          data: { position: { increment: newTracks.length } },
+        });
+
+        await prisma.playlistTrack.createMany({
+          data: newTracks.map((track, index) => ({
+            playlistId,
+            trackId: track.trackId,
+            position: index,
+            originalPosition: index,
+          })),
+          skipDuplicates: true,
+        });
+      }
 
       return prisma.playlistTrack.findMany({
         where: { playlistId },
@@ -139,5 +145,71 @@ export class PlaylistService {
         orderBy: { position: 'asc' },
       });
     });
+  }
+
+  async shufflePlaylist(playlistId: string) {
+    const tracks = await this.prisma.playlistTrack.findMany({
+      where: { playlistId },
+      orderBy: { originalPosition: 'asc' },
+    });
+
+    const shuffledTracks = [...tracks];
+
+    for (let i = shuffledTracks.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [shuffledTracks[i], shuffledTracks[j]] = [
+        shuffledTracks[j],
+        shuffledTracks[i],
+      ];
+    }
+
+    await this.prisma.$transaction(
+      shuffledTracks.map((track, index) =>
+        this.prisma.playlistTrack.update({
+          where: {
+            playlistId_trackId: {
+              playlistId,
+              trackId: track.trackId,
+            },
+          },
+          data: { position: index },
+        }),
+      ),
+    );
+  }
+
+  private async checkPlaylistOrder(playlistId: string) {
+    const tracks = await this.prisma.playlistTrack.findMany({
+      where: { playlistId },
+      orderBy: { originalPosition: 'asc' },
+    });
+
+    return tracks.some(
+      (track, index) =>
+        track.position !== index || track.originalPosition !== index,
+    );
+  }
+
+  async restorePlaylistOrder(playlistId: string) {
+    const tracks = await this.prisma.playlistTrack.findMany({
+      where: { playlistId },
+      orderBy: { originalPosition: 'asc' },
+    });
+
+    await this.prisma.$transaction(
+      tracks.map((track) =>
+        this.prisma.playlistTrack.update({
+          where: {
+            playlistId_trackId: {
+              playlistId,
+              trackId: track.trackId,
+            },
+          },
+          data: {
+            position: track.originalPosition,
+          },
+        }),
+      ),
+    );
   }
 }

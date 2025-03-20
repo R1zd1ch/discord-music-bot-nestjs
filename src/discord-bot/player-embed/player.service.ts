@@ -26,13 +26,12 @@ export class PlayerService {
       //@ts-ignore
       // eslint-disable-next-line
       const queueItems = queue.items;
-      const [queueTracks, queuePlaylists] = this.splitQueueItems(
-        queueItems as QueueItem[],
-      );
+      // const [queueTracks, queuePlaylists] = this.splitQueueItems(
+      //   queueItems as QueueItem[],
+      // );
 
       const remainingTracks = this.calculateRemainingTracks(
-        queueTracks,
-        queuePlaylists,
+        queueItems as QueueItem[],
         queue.currentPosition,
       );
 
@@ -56,38 +55,45 @@ export class PlayerService {
     }
   }
 
-  private splitQueueItems(items: QueueItem[]) {
-    return items.reduce(
-      (acc, item) => {
-        if (item.type === QueueItemType.TRACK) {
-          acc[0].push(item);
-        } else {
-          acc[1].push(item);
-        }
-        return acc;
-      },
-      [[], []] as [QueueItem[], QueueItem[]],
-    );
-  }
+  // private splitQueueItems(items: QueueItem[]) {
+  //   return items.reduce(
+  //     (acc, item) => {
+  //       if (item.type === QueueItemType.TRACK) {
+  //         acc[0].push(item);
+  //       } else {
+  //         acc[1].push(item);
+  //       }
+  //       return acc;
+  //     },
+  //     [[], []] as [QueueItem[], QueueItem[]],
+  //   );
+  // }
 
   private calculateRemainingTracks(
-    tracks: QueueItem[],
-    playlists: QueueItem[],
+    queueItems: QueueItem[],
     currentPosition: number,
   ) {
-    const playlistsCount = playlists.reduce((acc, item) => {
-      const currentIndex = item.currentIndex ?? 0;
-      // eslint-disable-next-line
+    let total = 0;
+
+    // Перебираем все элементы после текущей позиции
+    for (let i = currentPosition; i < queueItems.length; i++) {
+      const item = queueItems[i];
+      //eslint-disable-next-line
       //@ts-ignore
-      // eslint-disable-next-line
-      return acc + (item.playlist.tracks.length - currentIndex - 1);
-    }, 0);
-    // const tracksCount =
-    //   tracks.length + playlists.length - playlistsCount - currentPosition - 1;
+      if (item.type === QueueItemType.PLAYLIST && item.playlist) {
+        // Для плейлистов учитываем оставшиеся треки
+        const playedTracks = item.currentIndex ?? 0;
+        //eslint-disable-next-line
+        //@ts-ignore
+        //eslint-disable-next-line
+        total += item.playlist.tracks.length - playedTracks;
+      } else {
+        // Для обычных треков учитываем сам трек
+        total += 1;
+      }
+    }
 
-    const tracksCount = tracks.length + playlists.length - currentPosition - 1;
-
-    return tracksCount + playlistsCount;
+    return total - 1;
   }
 
   private async updateOrCreateMessage(

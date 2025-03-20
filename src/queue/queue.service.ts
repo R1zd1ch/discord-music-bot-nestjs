@@ -35,6 +35,94 @@ export class QueueService {
     return queue;
   }
 
+  async getPlaylistsFromQueue(guildId: string) {
+    const queuePlaylists = await this.prisma.queueItem.findMany({
+      where: {
+        queue: {
+          guildId,
+        },
+        type: QueueItemType.PLAYLIST,
+      },
+      select: {
+        playlist: true,
+      },
+    });
+
+    if (!queuePlaylists || !queuePlaylists[0].playlist) return [];
+
+    return queuePlaylists;
+  }
+
+  async shuffleQueue(guildId: string) {
+    const queue = await this.prisma.queue.findUnique({
+      where: {
+        guildId,
+      },
+      include: {
+        items: {
+          orderBy: { position: 'asc' },
+        },
+      },
+    });
+
+    if (!queue || queue.items.length < 2) return;
+
+    const currentItem = this.getCurrentItem(queue);
+    if (!currentItem) return;
+
+    const itemsToShuffle = [...queue.items];
+
+    for (let i = itemsToShuffle.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [itemsToShuffle[i], itemsToShuffle[j]] = [
+        itemsToShuffle[j],
+        itemsToShuffle[i],
+      ];
+    }
+
+    const newItems = itemsToShuffle;
+
+    await this.reorderQueueItems(newItems);
+  }
+
+  async restoreQueueOrder(guildId: string) {
+    const queue = await this.prisma.queue.findUnique({
+      where: {
+        guildId,
+      },
+      include: {
+        items: {
+          orderBy: { originalPosition: 'asc' },
+        },
+      },
+    });
+
+    if (!queue) return;
+
+    await this.reorderQueueItems(queue.items);
+
+    // Сбрасываем currentPosition
+    await this.prisma.queue.update({
+      where: { guildId },
+      data: { currentPosition: 0 },
+    });
+  }
+
+  private async reorderQueueItems(items: QueueItem[]) {
+    await this.prisma.$transaction(
+      items.map((item, index) =>
+        this.prisma.queueItem.update({
+          where: { id: item.id },
+          data: {
+            position: index,
+            originalPosition:
+              item.originalPosition === -1 ? index : item.originalPosition,
+          },
+        }),
+      ),
+    );
+  }
+
   async addTracksToQueue(guildId: string, trackIds: string[]) {
     let queue = await this.prisma.queue.findFirst({
       where: {
@@ -62,6 +150,7 @@ export class QueueService {
       trackId,
       type: QueueItemType.TRACK,
       position: currentPosition + index,
+      originalPosition: currentPosition + index,
     }));
 
     return this.prisma.queueItem.createMany({
@@ -93,6 +182,7 @@ export class QueueService {
         playlistId,
         type: QueueItemType.PLAYLIST,
         position,
+        originalPosition: position,
         currentIndex: 0,
       },
     });
@@ -123,7 +213,6 @@ export class QueueService {
           where: { id: currentItem.id },
           data: { currentIndex: newIndex },
         });
-        return;
       }
     }
 
@@ -227,6 +316,18 @@ export class QueueService {
         playerMessageId: messageId,
       },
     });
+  }
+
+  async getPlayerMessageId(guildId: string) {
+    const queue = await this.prisma.queue.findFirst({
+      where: {
+        guildId,
+      },
+      select: {
+        playerMessageId: true,
+      },
+    });
+    return queue?.playerMessageId;
   }
 
   async setLoopMode(guildId: string) {

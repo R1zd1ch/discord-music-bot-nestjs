@@ -7,6 +7,8 @@ import { AudioConnectionManagerService } from './audio-connection-manager.servic
 import { AudioPlayerStatus } from '@discordjs/voice';
 import { TrackResolverService } from './track-resolver.service';
 import { QueueItem } from '@prisma/client';
+import { PlaylistService } from 'src/playlist/playlist.service';
+import { Client } from 'discord.js';
 
 @Injectable()
 export class PlayerInteractionService {
@@ -17,6 +19,8 @@ export class PlayerInteractionService {
     private readonly playerService: PlayerService,
     private readonly connectionManager: AudioConnectionManagerService,
     private readonly trackResolver: TrackResolverService,
+    private readonly playlistService: PlaylistService,
+    private readonly client: Client,
   ) {}
 
   async handleControlCommand(
@@ -39,10 +43,6 @@ export class PlayerInteractionService {
     let needsProcessQueue = false;
 
     switch (action) {
-      case 'next':
-        await this.queueService.nextTrack(guildId);
-        needsProcessQueue = true;
-        break;
       case 'prev':
         await this.queueService.prevTrack(guildId);
         needsProcessQueue = true;
@@ -52,7 +52,11 @@ export class PlayerInteractionService {
         needsProcessQueue = false;
         break;
       case 'stop':
-        await this.queueService.clearQueue(guildId);
+        await this.handleStop(guildId, [interaction]);
+        needsProcessQueue = true;
+        break;
+      case 'next':
+        await this.queueService.nextTrack(guildId);
         needsProcessQueue = true;
         break;
       case 'skipItem': {
@@ -62,6 +66,11 @@ export class PlayerInteractionService {
       }
       case 'loop':
         await this.queueService.setLoopMode(guildId);
+        needsProcessQueue = true;
+        break;
+
+      case 'shuffle':
+        await this.shuffleQueue(guildId);
         needsProcessQueue = true;
         break;
       case 'volume':
@@ -101,6 +110,35 @@ export class PlayerInteractionService {
       player.pause();
       this.logger.debug('Player paused');
     }
+  }
+
+  private async shuffleQueue(guildId: string) {
+    await this.queueService.shuffleQueue(guildId);
+
+    const queuePlaylists =
+      await this.queueService.getPlaylistsFromQueue(guildId);
+
+    if (queuePlaylists) {
+      for (const item of queuePlaylists) {
+        if (item.playlist?.id) {
+          await this.playlistService.shufflePlaylist(item.playlist.id);
+        }
+      }
+    }
+  }
+
+  private async handleStop(
+    guildId: string,
+    [interaction]: SlashCommandContext,
+  ) {
+    const messageId = await this.queueService.getPlayerMessageId(guildId);
+    const channelId = interaction.channelId;
+
+    if (!messageId || !channelId) {
+      await this.queueService.clearQueue(guildId);
+    }
+
+    await this.queueService.clearQueue(guildId);
   }
 
   private async updatePlayerMessage(

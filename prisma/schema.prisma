@@ -32,14 +32,17 @@ model Playlist {
 }
 
 model PlaylistTrack {
-  id         String   @id @default(uuid())
-  playlistId String
-  playlist   Playlist @relation(fields: [playlistId], references: [id], onDelete: Cascade)
-  track      Track    @relation(fields: [trackId], references: [trackId])
-  trackId    String
-  position   Int
+  id               String   @id @default(uuid())
+  playlistId       String
+  playlist         Playlist @relation(fields: [playlistId], references: [id], onDelete: Cascade)
+  track            Track    @relation(fields: [trackId], references: [trackId])
+  trackId          String
+  position         Int
+  originalPosition Int
 
   createdAt DateTime @default(now())
+
+  @@unique([playlistId, trackId])
 }
 
 model Track {
@@ -89,10 +92,11 @@ model QueueItem {
   track   Track?        @relation(fields: [trackId], references: [trackId])
   trackId String?
 
-  playlist     Playlist? @relation(fields: [playlistId], references: [id])
-  playlistId   String?
-  position     Int
-  currentIndex Int       @default(0)
+  playlist         Playlist? @relation(fields: [playlistId], references: [id])
+  playlistId       String?
+  position         Int
+  originalPosition Int
+  currentIndex     Int       @default(0)
 
   addedAt DateTime @default(now())
 }
