@@ -198,6 +198,26 @@ export class QueueService {
     return;
   }
 
+  async setVolume(guildId: string, volume: number) {
+    return this.prisma.queue.update({
+      where: {
+        guildId,
+      },
+      data: { volume: Math.min(Math.max(volume, 0), 200) },
+    });
+  }
+
+  async getVolume(guildId: string) {
+    const queue = await this.prisma.queue.findFirst({
+      where: { guildId },
+      select: {
+        volume: true,
+      },
+    });
+
+    return queue?.volume ?? 100;
+  }
+
   async updatePlayerMessageId(guildId: string, messageId: string) {
     return this.prisma.queue.update({
       where: {

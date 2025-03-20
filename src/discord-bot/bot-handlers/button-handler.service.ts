@@ -4,6 +4,7 @@ import { Button, Context, SlashCommandContext } from 'necord';
 import { GuildMember } from 'discord.js';
 import { AudioConnectionManagerService } from '../voice/audio-connection-manager.service';
 import { AudioPlayerStatus } from '@discordjs/voice';
+import { changeVolumeModal } from '../player-embed/modals.components';
 
 @Injectable()
 export class ButtonHandlerService {
@@ -257,6 +258,41 @@ export class ButtonHandlerService {
     setTimeout(() => {
       interaction.deleteReply().catch(() => {});
     }, this.TIME_TO_DELETE_MESSAGE);
+  }
+
+  @Button('volume')
+  async changeVolume(@Context() [interaction]: SlashCommandContext) {
+    try {
+      const guildId = interaction.guildId;
+      const username = interaction.user.username;
+      const member = interaction.member;
+
+      if (!(await this.checkUserInVoiceChannel([interaction]))) return;
+
+      if (!guildId || !username || !member) {
+        const message = await interaction.reply({
+          content: '❌ Произошла ошибка при обработке команды',
+        });
+
+        setTimeout(() => {
+          message.delete().catch(() => {});
+        }, this.TIME_TO_DELETE_MESSAGE);
+        return;
+      }
+
+      const modal = changeVolumeModal();
+
+      await interaction.showModal(modal).catch(() => {});
+    } catch {
+      const message = await interaction.reply({
+        content:
+          '❌ Произошла ошибка при обработке команды изменения громкости',
+      });
+
+      setTimeout(() => {
+        message.delete().catch(() => {});
+      }, this.TIME_TO_DELETE_MESSAGE);
+    }
   }
 
   private async checkUserInVoiceChannel([interaction]: SlashCommandContext) {

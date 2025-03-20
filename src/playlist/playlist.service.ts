@@ -88,6 +88,7 @@ export class PlaylistService {
   async addTracksToPlaylist(playlistId: string, tracks: Track[]) {
     this.logger.debug('adding tracks to playlist');
     const trackIds = tracks.map((track) => track.trackId);
+    // console.log(tracks);
 
     // Получаем существующие треки
     const existingTracks = await this.prisma.playlistTrack.findMany({
@@ -99,6 +100,12 @@ export class PlaylistService {
     const newTracks = tracks.filter(
       (track) => !existingTrackIds.has(track.trackId),
     );
+
+    // const deletedTracks = existingTracks.filter(
+    //   (track) => !trackIds.includes(track.trackId),
+    // );
+
+    // console.log(deletedTracks);
 
     if (newTracks.length === 0) {
       return this.prisma.playlistTrack.findMany({

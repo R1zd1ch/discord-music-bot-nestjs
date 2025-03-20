@@ -36,6 +36,8 @@ export class PlayerService {
         queue.currentPosition,
       );
 
+      const volume = queue?.volume ?? 100;
+
       // eslint-disable-next-line
       const nextTrack = this.getNextTrack(
         queueItems as QueueItem[],
@@ -45,6 +47,7 @@ export class PlayerService {
         currentTrack,
         remainingTracks,
         nextTrack as Track,
+        volume,
       );
 
       await this.updateOrCreateMessage([interaction], queue, embed, isPaused);
@@ -153,7 +156,8 @@ export class PlayerService {
   private buildEmbed(
     currentTrack: Track,
     remainingTracks: number,
-    nextTrack: Track,
+    nextTrack: Track | null,
+    volume: number,
   ) {
     const embed = new EmbedBuilder()
       .setColor('Purple')
@@ -170,19 +174,27 @@ export class PlayerService {
       );
 
     if (remainingTracks > 0) {
-      embed.addFields({
-        name: '📜 До конца',
-        value: `${remainingTracks} трек(ов)`,
-        inline: false,
-      });
+      embed.addFields(
+        { name: '', value: '', inline: false },
+        {
+          name: '📜 До конца',
+          value: `${remainingTracks} трек(ов)`,
+          inline: true,
+        },
+        { name: '🔊 Громкость', value: `${volume}%`, inline: true },
+      );
     }
 
     if (remainingTracks < 1) {
-      embed.addFields({
-        name: '📜 До конца',
-        value: 'Треки закончились',
-        inline: false,
-      });
+      embed.addFields(
+        { name: '', value: '', inline: false },
+        {
+          name: '📜 До конца',
+          value: 'Треки закончились',
+          inline: true,
+        },
+        { name: '🔊 Громкость', value: `${volume}%`, inline: true },
+      );
     }
     // eslint-disable-next-line
     //@ts-ignore

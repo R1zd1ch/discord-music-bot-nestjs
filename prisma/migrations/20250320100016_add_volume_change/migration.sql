@@ -1,0 +1,2 @@
+-- AlterTable
+ALTER TABLE "Queue" ADD COLUMN     "volume" INTEGER NOT NULL DEFAULT 100;

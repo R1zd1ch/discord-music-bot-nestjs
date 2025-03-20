@@ -24,6 +24,7 @@ import { TrackResolverService } from './voice/track-resolver.service';
 import { CommandHandlerService } from './bot-handlers/command-handler.service';
 import { EventHandlerService } from './bot-handlers/event-handler.service';
 import { ButtonHandlerService } from './bot-handlers/button-handler.service';
+import { ModalHandlerService } from './bot-handlers/modal-handler.service';
 
 @Module({
   imports: [
@@ -61,6 +62,7 @@ import { ButtonHandlerService } from './bot-handlers/button-handler.service';
     CommandHandlerService,
     EventHandlerService,
     ButtonHandlerService,
+    ModalHandlerService,
   ],
 })
 export class DiscordBotModule {}

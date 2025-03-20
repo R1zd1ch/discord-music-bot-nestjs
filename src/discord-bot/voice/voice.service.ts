@@ -78,11 +78,14 @@ export class VoiceService {
       | 'volume'
       | 'skipItem',
     context: SlashCommandContext,
+    volume: number = 100,
   ) {
+    this.logger.debug(`setting volume: ${volume} in handleControl`);
     await this.interactionService.handleControlCommand(
       guildId,
       context,
       action,
+      volume,
     );
   }
 

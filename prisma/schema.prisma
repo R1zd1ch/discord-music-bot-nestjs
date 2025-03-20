@@ -65,6 +65,7 @@ model Queue {
 
   loopMode   LoopMode @default(NONE)
   isShuffled Boolean  @default(false)
+  volume     Int      @default(100)
 }
 
 enum LoopMode {

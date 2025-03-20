@@ -10,6 +10,7 @@ import {
   AudioPlayer,
   AudioPlayerStatus,
   createAudioResource,
+  StreamType,
 } from '@discordjs/voice';
 
 @Injectable()
@@ -62,7 +63,15 @@ export class QueueProcessorService {
     [interaction]: SlashCommandContext,
   ) {
     const filePath = await this.trackCache.getTrackPath(track.trackId);
-    const resource = createAudioResource(filePath);
+    const volume = queue?.volume ?? 100;
+
+    const resource = createAudioResource(filePath, {
+      inlineVolume: true,
+      inputType: StreamType.Arbitrary,
+    });
+
+    resource.volume?.setVolumeLogarithmic(volume / 100);
+
     player.play(resource);
 
     await this.playerService.renderMusicMessage(track, queue, [interaction]);

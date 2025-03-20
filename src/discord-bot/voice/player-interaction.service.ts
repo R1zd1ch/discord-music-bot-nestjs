@@ -33,6 +33,7 @@ export class PlayerInteractionService {
       | 'help'
       | 'volume'
       | 'skipItem',
+    volume: number = 100,
   ) {
     // let needsUpdate = true;
     let needsProcessQueue = false;
@@ -61,6 +62,11 @@ export class PlayerInteractionService {
       }
       case 'loop':
         await this.queueService.setLoopMode(guildId);
+        needsProcessQueue = true;
+        break;
+      case 'volume':
+        this.logger.debug(`received volume in handleControlCommand: ${volume}`);
+        await this.queueService.setVolume(guildId, volume);
         needsProcessQueue = true;
         break;
     }
@@ -96,6 +102,7 @@ export class PlayerInteractionService {
       this.logger.debug('Player paused');
     }
   }
+
   private async updatePlayerMessage(
     guildId: string,
     [interaction]: SlashCommandContext,
