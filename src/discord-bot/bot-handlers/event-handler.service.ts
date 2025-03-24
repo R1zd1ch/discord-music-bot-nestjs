@@ -5,7 +5,7 @@ import { AudioConnectionManagerService } from '../voice/audio-connection-manager
 @Injectable()
 export class EventHandlerService {
   private readonly logger = new Logger(EventHandlerService.name);
-  private readonly TIME_TO_LEAVE_VOICE_CHANNEL = 1 * 60 * 1000;
+  private readonly TIME_TO_LEAVE_VOICE_CHANNEL = 0.5 * 60 * 1000;
   constructor(
     private readonly connectionsManager: AudioConnectionManagerService,
   ) {}
@@ -23,13 +23,18 @@ export class EventHandlerService {
     ) {
       this.logger.debug(`check voiceStateUpdate in ${voiceChannel.name}`);
       setTimeout(() => {
-        const connection = this.connectionsManager.getConnection(
-          voiceChannel.guild.id,
-        );
+        if (
+          voiceChannel.members.size === 1 &&
+          voiceChannel.members.filter((member) => !member.user.bot).size === 0
+        ) {
+          const connection = this.connectionsManager.getConnection(
+            voiceChannel.guild.id,
+          );
 
-        if (connection) {
-          this.connectionsManager.cleanupConnections(voiceChannel.guild.id);
-          this.logger.debug(`Leaving ${voiceChannel.name}`);
+          if (connection) {
+            this.connectionsManager.cleanupConnections(voiceChannel.guild.id);
+            this.logger.debug(`Leaving ${voiceChannel.name}`);
+          }
         }
       }, this.TIME_TO_LEAVE_VOICE_CHANNEL);
     }

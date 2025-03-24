@@ -4,7 +4,10 @@ import { Button, Context, SlashCommandContext } from 'necord';
 import { GuildMember } from 'discord.js';
 import { AudioConnectionManagerService } from '../voice/audio-connection-manager.service';
 import { AudioPlayerStatus } from '@discordjs/voice';
-import { changeVolumeModal } from '../player-embed/modals.components';
+import { changeVolumeModal } from '../player/modals.components';
+import { NecordPaginationService } from '@necord/pagination';
+import { QueuePaginationService } from '../player/queue-pagination.service';
+import { helpComponent } from '../player/help.embed';
 
 @Injectable()
 export class ButtonHandlerService {
@@ -13,6 +16,8 @@ export class ButtonHandlerService {
   constructor(
     private readonly voiceService: VoiceService,
     private readonly connectionManager: AudioConnectionManagerService,
+    private readonly paginationService: NecordPaginationService,
+    private readonly queuePaginationService: QueuePaginationService,
   ) {}
 
   @Button('prev')
@@ -55,7 +60,7 @@ export class ButtonHandlerService {
 
   @Button('resume_pause')
   public async resumePause(@Context() [interaction]: SlashCommandContext) {
-    await interaction.deferReply({});
+    await interaction.deferReply({ ephemeral: true });
 
     try {
       const guildId = interaction.guildId;
@@ -130,7 +135,7 @@ export class ButtonHandlerService {
         .finally(() => {
           interaction
             .editReply({
-              content: `${username} велел боту ливнуть с позором с голосового канала (тот кто заставил напёрдышь)`,
+              content: `${username} велел боту ливнуть с позором с голосового канала`,
             })
             .catch(() => {});
         });
@@ -293,6 +298,76 @@ export class ButtonHandlerService {
         content: '❌ Произошла ошибка при обработке команды перемешивания',
       });
     }
+
+    setTimeout(() => {
+      interaction.deleteReply().catch(() => {});
+    }, this.TIME_TO_DELETE_MESSAGE);
+  }
+
+  @Button('queue')
+  async queue(@Context() [interaction]: SlashCommandContext) {
+    try {
+      const guildId = interaction.guildId;
+      const username = interaction.user.username;
+      const member = interaction.member;
+
+      if (!(await this.checkUserInVoiceChannel([interaction]))) return;
+
+      if (!guildId || !username || !member) {
+        await interaction.reply({
+          content: '❌ Произошла ошибка при обработке команды',
+          ephemeral: true,
+        });
+        return;
+      }
+
+      await this.queuePaginationService.testPagination([interaction]);
+    } catch {
+      await interaction.reply({
+        content: '❌ Произошла ошибка при обработке команды очереди',
+        ephemeral: true,
+      });
+    }
+
+    setTimeout(
+      () => {
+        interaction.deleteReply().catch(() => {});
+      },
+      this.TIME_TO_DELETE_MESSAGE + 1.5 * 60 * 1000,
+    );
+  }
+
+  @Button('help')
+  async help(@Context() [interaction]: SlashCommandContext) {
+    await interaction.deferReply({ ephemeral: true });
+    try {
+      const guildId = interaction.guildId;
+      const member = interaction.member;
+
+      if (!(await this.checkUserInVoiceChannel([interaction]))) return;
+
+      if (!guildId || !member) {
+        await interaction.editReply({
+          content: '❌ Произошла ошибка при обработке команды',
+        });
+        return;
+      }
+      await interaction.editReply({
+        embeds: [helpComponent()],
+      });
+      // await this.voiceService.handleControl(guildId, 'help', [interaction]);
+    } catch {
+      await interaction.editReply({
+        content: '❌ Произошла ошибка при обработке команды помощи',
+      });
+    }
+
+    setTimeout(
+      () => {
+        interaction.deleteReply().catch(() => {});
+      },
+      this.TIME_TO_DELETE_MESSAGE + 1.5 * 60 * 1000,
+    );
   }
 
   @Button('volume')
@@ -307,6 +382,7 @@ export class ButtonHandlerService {
       if (!guildId || !username || !member) {
         const message = await interaction.reply({
           content: '❌ Произошла ошибка при обработке команды',
+          ephemeral: true,
         });
 
         setTimeout(() => {
@@ -322,6 +398,7 @@ export class ButtonHandlerService {
       const message = await interaction.reply({
         content:
           '❌ Произошла ошибка при обработке команды изменения громкости',
+        ephemeral: true,
       });
 
       setTimeout(() => {
@@ -332,14 +409,39 @@ export class ButtonHandlerService {
 
   private async checkUserInVoiceChannel([interaction]: SlashCommandContext) {
     const member = interaction.member as GuildMember;
-    if (!member || !member.voice.channel) {
-      await interaction.reply({
+    const bot = interaction.guild?.members.me; // Получаем бота в гильдии
+
+    if (!member?.voice?.channel) {
+      const message = await interaction.editReply({
         content:
           '❌ Вы должны быть в голосовом канале, чтобы использовать кнопки!',
-        ephemeral: true,
       });
+      setTimeout(() => {
+        message.delete().catch(() => {});
+      }, this.TIME_TO_DELETE_MESSAGE);
       return false;
     }
+
+    if (!bot?.voice?.channel) {
+      const message = await interaction.editReply({
+        content: '❌ Бот не находится в голосовом канале!',
+      });
+      setTimeout(() => {
+        message.delete().catch(() => {});
+      }, this.TIME_TO_DELETE_MESSAGE);
+      return false;
+    }
+
+    if (member.voice.channelId !== bot.voice.channelId) {
+      const message = await interaction.editReply({
+        content: '❌ Вы должны находиться в одном голосовом канале с ботом!',
+      });
+      setTimeout(() => {
+        message.delete().catch(() => {});
+      }, this.TIME_TO_DELETE_MESSAGE);
+      return false;
+    }
+
     return true;
   }
 }

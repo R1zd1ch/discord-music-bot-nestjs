@@ -26,9 +26,6 @@ export class PlayerService {
       //@ts-ignore
       // eslint-disable-next-line
       const queueItems = queue.items;
-      // const [queueTracks, queuePlaylists] = this.splitQueueItems(
-      //   queueItems as QueueItem[],
-      // );
 
       const remainingTracks = this.calculateRemainingTracks(
         queueItems as QueueItem[],
@@ -55,20 +52,6 @@ export class PlayerService {
     }
   }
 
-  // private splitQueueItems(items: QueueItem[]) {
-  //   return items.reduce(
-  //     (acc, item) => {
-  //       if (item.type === QueueItemType.TRACK) {
-  //         acc[0].push(item);
-  //       } else {
-  //         acc[1].push(item);
-  //       }
-  //       return acc;
-  //     },
-  //     [[], []] as [QueueItem[], QueueItem[]],
-  //   );
-  // }
-
   private calculateRemainingTracks(
     queueItems: QueueItem[],
     currentPosition: number,
@@ -81,14 +64,12 @@ export class PlayerService {
       //eslint-disable-next-line
       //@ts-ignore
       if (item.type === QueueItemType.PLAYLIST && item.playlist) {
-        // Для плейлистов учитываем оставшиеся треки
         const playedTracks = item.currentIndex ?? 0;
         //eslint-disable-next-line
         //@ts-ignore
         //eslint-disable-next-line
         total += item.playlist.tracks.length - playedTracks;
       } else {
-        // Для обычных треков учитываем сам трек
         total += 1;
       }
     }

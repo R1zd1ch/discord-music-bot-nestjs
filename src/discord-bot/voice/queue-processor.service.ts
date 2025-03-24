@@ -2,7 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { AudioConnectionManagerService } from './audio-connection-manager.service';
 import { QueueService } from 'src/queue/queue.service';
 import { TrackResolverService } from './track-resolver.service';
-import { PlayerService } from '../player-embed/player.service';
+import { PlayerService } from '../player/player.service';
 import { TrackCacheService } from './track-cache.service';
 import { SlashCommandContext } from 'necord';
 import { LoopMode, Queue, QueueItem, Track } from '@prisma/client';

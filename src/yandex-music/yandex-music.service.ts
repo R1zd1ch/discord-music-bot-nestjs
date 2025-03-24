@@ -29,8 +29,39 @@ export class YandexMusicService {
         return this.getTracksFromAlbumYM(query);
 
       default:
-        this.logger.error(`Invalid search query: ${query}`);
+        return this.getTrackByName(query);
     }
+  }
+
+  async getTrackByName(query: string) {
+    if (!query) return { tracks: [] };
+    const response = await this.yandexMusicClient.search.search(
+      query,
+      1,
+      'track',
+      true,
+    );
+
+    if (!response) return { tracks: [] };
+
+    const result = response?.result?.tracks?.results[0];
+
+    if (!result) return { tracks: [] };
+
+    const toDtoTrack = {
+      trackId: result.realId,
+      title: result.title,
+      artist: result.artists[0]?.name || 'Unknown Artist',
+      duration: (result.durationMs || 0).toString(),
+      url: this.buildTrackUrl(result.id),
+      coverUrl: result.coverUri ? this.buildCoverUrl(result.coverUri) : '',
+    };
+
+    await this.tracksService.createTrack(toDtoTrack);
+
+    return {
+      tracks: [toDtoTrack as Track],
+    };
   }
 
   async getTracksFromPlaylistYM(query: string) {
@@ -66,11 +97,9 @@ export class YandexMusicService {
       })
       .filter((track): track is CreateTrackDto => track !== undefined);
 
-    const added = await this.tracksService
-      .createTracks(toDtoTracks)
-      .then(() => {
-        this.logger.debug('created tracks from playlist');
-      });
+    await this.tracksService.createTracks(toDtoTracks).then(() => {
+      this.logger.debug('created tracks from playlist');
+    });
 
     this.logger.debug('returned music');
     return {
@@ -194,7 +223,9 @@ export class YandexMusicService {
         return { source };
       } catch (e: unknown) {
         retries++;
-        this.logger.error(`Yandex Music API error (attempt ${retries}): ${e}`);
+        this.logger.error(
+          `Yandex Music API error (attempt ${retries}): ${e as string}`,
+        );
 
         if (
           e &&

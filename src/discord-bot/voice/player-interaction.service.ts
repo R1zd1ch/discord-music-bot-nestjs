@@ -1,7 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { QueueService } from 'src/queue/queue.service';
 import { QueueProcessorService } from './queue-processor.service';
-import { PlayerService } from '../player-embed/player.service';
+import { PlayerService } from '../player/player.service';
 import { SlashCommandContext } from 'necord';
 import { AudioConnectionManagerService } from './audio-connection-manager.service';
 import { AudioPlayerStatus } from '@discordjs/voice';
@@ -9,6 +9,7 @@ import { TrackResolverService } from './track-resolver.service';
 import { QueueItem } from '@prisma/client';
 import { PlaylistService } from 'src/playlist/playlist.service';
 import { Client } from 'discord.js';
+import { helpComponent } from '../player/help.embed';
 
 @Injectable()
 export class PlayerInteractionService {
@@ -69,6 +70,10 @@ export class PlayerInteractionService {
         needsProcessQueue = true;
         break;
 
+      case 'help':
+        await this.handleHelp(guildId, [interaction]);
+        break;
+
       case 'shuffle':
         await this.shuffleQueue(guildId);
         needsProcessQueue = true;
@@ -118,13 +123,24 @@ export class PlayerInteractionService {
     const queuePlaylists =
       await this.queueService.getPlaylistsFromQueue(guildId);
 
-    if (queuePlaylists) {
+    if (queuePlaylists.length > 0) {
       for (const item of queuePlaylists) {
         if (item.playlist?.id) {
           await this.playlistService.shufflePlaylist(item.playlist.id);
         }
       }
     }
+
+    return;
+  }
+
+  private async handleHelp(
+    guildId: string,
+    [interaction]: SlashCommandContext,
+  ) {
+    await interaction.reply({
+      embeds: [helpComponent()],
+    });
   }
 
   private async handleStop(

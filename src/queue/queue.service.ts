@@ -48,7 +48,7 @@ export class QueueService {
       },
     });
 
-    if (!queuePlaylists || !queuePlaylists[0].playlist) return [];
+    if (!queuePlaylists || queuePlaylists.length === 0) return [];
 
     return queuePlaylists;
   }
@@ -70,7 +70,9 @@ export class QueueService {
     const currentItem = this.getCurrentItem(queue);
     if (!currentItem) return;
 
-    const itemsToShuffle = [...queue.items];
+    const itemsToShuffle = queue.items.filter(
+      (item) => item.id !== currentItem.id,
+    );
 
     for (let i = itemsToShuffle.length - 1; i > 0; i--) {
       const j = Math.floor(Math.random() * (i + 1));
@@ -80,9 +82,23 @@ export class QueueService {
       ];
     }
 
-    const newItems = itemsToShuffle;
+    const newItems = currentItem
+      ? [currentItem, ...itemsToShuffle]
+      : itemsToShuffle;
 
     await this.reorderQueueItems(newItems);
+
+    if (currentItem) {
+      const newPosition = newItems.findIndex(
+        (item) => item.id === currentItem.id,
+      );
+
+      const toPosition = newPosition;
+      await this.prisma.queue.update({
+        where: { guildId },
+        data: { currentPosition: toPosition },
+      });
+    }
   }
 
   async restoreQueueOrder(guildId: string) {
@@ -138,19 +154,19 @@ export class QueueService {
       });
     }
 
-    const currentPosition =
-      (await this.prisma.queueItem.count({
-        where: {
-          queueId: queue.id,
-        },
-      })) + 1;
+    // const currentPosition =
+    //   (await this.prisma.queueItem.count({
+    //     where: {
+    //       queueId: queue.id,
+    //     },
+    //   })) + 1;
 
     const queueItems = trackIds.map((trackId, index) => ({
       queueId: queue.id,
       trackId,
       type: QueueItemType.TRACK,
-      position: currentPosition + index,
-      originalPosition: currentPosition + index,
+      position: index,
+      originalPosition: -1,
     }));
 
     return this.prisma.queueItem.createMany({
@@ -169,12 +185,11 @@ export class QueueService {
       queue = await this.prisma.queue.create({ data: { guildId } });
     }
 
-    const position =
-      (await this.prisma.queueItem.count({
-        where: {
-          queueId: queue.id,
-        },
-      })) + 1;
+    const position = await this.prisma.queueItem.count({
+      where: {
+        queueId: queue.id,
+      },
+    });
 
     const response = await this.prisma.queueItem.create({
       data: {
