@@ -166,10 +166,21 @@ export class CommandHandlerService {
     description: 'Помощь',
   })
   async help(@Context() [interaction]: SlashCommandContext) {
-    await interaction.reply({
-      embeds: [helpComponent()],
-      ephemeral: true,
-    });
+    await interaction.deferReply({ ephemeral: true });
+    try {
+      await interaction.editReply({
+        embeds: [helpComponent()],
+      });
+    } catch (error) {
+      this.logger.error('Ошибка при отправке справки:', error);
+      await interaction.editReply({
+        content: '❌ Произошла ошибка при отправке справки',
+      });
+    }
+
+    setTimeout(() => {
+      interaction.deleteReply().catch(() => {});
+    }, this.TIME_TO_DELETE_MESSAGE);
   }
   private async checkUserInVoiceChannel(
     [interaction]: SlashCommandContext,

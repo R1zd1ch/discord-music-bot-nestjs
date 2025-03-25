@@ -86,6 +86,9 @@ importers:
       sharp:
         specifier: ^0.33.5
         version: 0.33.5
+      spotify-api.js:
+        specifier: ^9.2.5
+        version: 9.2.5
       yandex-music-client:
         specifier: ^0.4.3
         version: 0.4.3
@@ -4278,6 +4281,12 @@ packages:
   source-map@0.8.0-beta.0:
     resolution: {integrity: sha512-2ymg6oRBpebeZi9UUNsgQ89bhx01TcTkmNTGnNO88imTmbSgy4nfujrgVEFKWpMTEGA11EDkTt7mqObTPdigIA==}
     engines: {node: '>= 8'}
+
+  spotify-api.js@9.2.5:
+    resolution: {integrity: sha512-Q+196XA6zUDvqQ5mMNgPN4l5j8vDF18DVqlwFnn0TX0MqLfOhrKfoeMR5OYNhpa99LVjEvwNF/WPaTAy0MqBJQ==}
+
+  spotify-types@1.0.7:
+    resolution: {integrity: sha512-X2n0MYNUpgakGDU7h/vzTvqVJh2f8kAWE9SG5TkJtf3lJcorndK24/8/6+D7Uww8tqUD1VPHg5Lqv4usdVJUvg==}
 
   spotify-uri@4.1.0:
     resolution: {integrity: sha512-SFpBt8pQqO7DOFBsdUjv3GxGZAKYP7UqcTflfE7h3YL1lynl/6Motq7NERoJJR8eF9kXQRSpcdMmV5ou84rbng==}
@@ -9382,6 +9391,15 @@ snapshots:
   source-map@0.8.0-beta.0:
     dependencies:
       whatwg-url: 7.1.0
+
+  spotify-api.js@9.2.5:
+    dependencies:
+      axios: 1.8.2
+      spotify-types: 1.0.7
+    transitivePeerDependencies:
+      - debug
+
+  spotify-types@1.0.7: {}
 
   spotify-uri@4.1.0: {}
 

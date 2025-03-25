@@ -46,6 +46,7 @@
     "reflect-metadata": "^0.2.2",
     "rxjs": "^7.8.1",
     "sharp": "^0.33.5",
+    "spotify-api.js": "^9.2.5",
     "yandex-music-client": "^0.4.3"
   },
   "devDependencies": {
