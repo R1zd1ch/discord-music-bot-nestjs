@@ -13,6 +13,7 @@ export class PrismaService
           url: process.env.DATABASE_URL!,
         },
       },
+      log: ['error', 'warn'],
     });
   }
 

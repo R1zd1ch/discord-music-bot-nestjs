@@ -14,10 +14,9 @@ datasource db {
 }
 
 model User {
-  id           String     @id @default(uuid())
-  discordId    String     @unique
-  playlists    Playlist[]
-  commandUsage Json?      @default("{}")
+  id        String     @id @default(uuid())
+  discordId String     @unique
+  playlists Playlist[]
 }
 
 model Playlist {
