@@ -80,19 +80,17 @@ export class PlaylistService {
 
       // Add new tracks
       if (newTracks.length > 0) {
-        const maxPosition = await prisma.playlistTrack
-          .aggregate({
-            _max: { position: true },
-            where: { playlistId },
-          })
-          .then((res) => res._max.position ?? -1);
+        await prisma.$executeRaw`
+        UPDATE "PlaylistTrack"
+        SET position = position + ${newTracks.length}
+        WHERE "playlistId" = ${playlistId}`;
 
         await prisma.playlistTrack.createMany({
           data: newTracks.map((t, i) => ({
             playlistId,
             trackId: t.trackId,
-            position: maxPosition + i + 1,
-            originalPosition: maxPosition + i + 1,
+            position: i,
+            originalPosition: i,
           })),
         });
       }
