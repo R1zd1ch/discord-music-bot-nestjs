@@ -11,37 +11,7 @@ permissions:
   security-events: write
 
 jobs:
-  build:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - uses: pnpm/action-setup@v4
-        name: Install pnpm
-        with:
-          version: 10
-          run_install: false
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: 20
-          cache: 'pnpm'
-
-      - name: Verify pnpm installation
-        run: pnpm --version
-
-      - name: Install dependencies
-        run: pnpm install
-
-      - name: Generate Prisma Client
-        run: npx prisma generate
-
-      - name: Build NestJS app
-        run: pnpm run build
   deploy:
-    needs: build
     runs-on: ubuntu-latest
     steps:
       - name: Checkout respository

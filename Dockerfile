@@ -1,19 +1,29 @@
-FROM node:20-alpine
+FROM node:20-slim
 
 WORKDIR /app
 
-COPY package.json pnpm-lock.yaml ./
+# Установка curl, unzip, ffmpeg, python3, make и g++
+RUN apt-get update \
+  && apt-get install -y curl unzip ffmpeg python3 make g++ \
+  && rm -rf /var/lib/apt/lists/* \
+  && curl -fsSL https://bun.sh/install | bash \
+  && mv /root/.bun/bin/bun /usr/local/bin/ \
+  && mv /root/.bun/bin/bunx /usr/local/bin/
 
-RUN corepack enable && corepack prepare pnpm@latest --activate
+# Копирование зависимостей и установка
+COPY bun.lock* package.json tsconfig.json ./
+RUN bun install
+RUN bun add @prisma/client prisma
 
-RUN pnpm install
+# Копируем Prisma-схему и генерируем клиента
+COPY prisma ./prisma
+RUN bun run prisma generate
 
-RUN apk add --no-cache ffmpeg
-
+# Копирование всего остального кода
 COPY . .
 
-RUN npx prisma generate
+# Сборка
+RUN bun run build
 
-RUN pnpm run build
-
-CMD ["pnpm", "run", "start:prod"]
+# Запуск
+CMD ["bun", "run", "dist/main.js"]
