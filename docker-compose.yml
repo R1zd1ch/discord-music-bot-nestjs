@@ -5,33 +5,33 @@ services:
     container_name: ${APP_HOST}
     build: .
     restart: always
-    environment:
-      - POSTGRES_HOST=db
+    # environment:
+    #   - POSTGRES_HOST=db
     env_file: .env
     ports:
       - '${APP_PORT}:${APP_PORT}'
-  db:
-    container_name: discord_music_bot_db
-    image: postgres:15.2
-    restart: always
-    environment:
-      - POSTGRES_USER=${POSTGRES_USER}
-      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
-      - POSTGRES_DB=${POSTGRES_DB}
-    ports:
-      - '${POSTGRES_PORT}:${POSTGRES_PORT}'
-    volumes:
-      - music_bot_db:/var/lib/postgresql/data
-    healthcheck:
-      test: ['CMD-SHELL', 'pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}']
-      interval: 5s
-      timeout: 5s
-      retries: 5
-    networks:
-      - music_bot
+#   db:
+#     container_name: discord_music_bot_db
+#     image: postgres:15.2
+#     restart: always
+#     environment:
+#       - POSTGRES_USER=${POSTGRES_USER}
+#       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+#       - POSTGRES_DB=${POSTGRES_DB}
+#     ports:
+#       - '${POSTGRES_PORT}:${POSTGRES_PORT}'
+#     volumes:
+#       - music_bot_db:/var/lib/postgresql/data
+#     healthcheck:
+#       test: ['CMD-SHELL', 'pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}']
+#       interval: 5s
+#       timeout: 5s
+#       retries: 5
+#     networks:
+#       - music_bot
 
-volumes:
-  music_bot_db:
+# volumes:
+#   music_bot_db:
 
-networks:
-  music_bot:
+# networks:
+#   music_bot:
