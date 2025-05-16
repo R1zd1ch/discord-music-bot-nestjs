@@ -17,8 +17,10 @@ COPY prisma ./prisma
 RUN bun run prisma generate
 
 COPY . .
+COPY start.sh /app/start.sh
 
 RUN bun run build
+RUN chmod +x /app/start.sh
 
 CMD ["/app/start.sh"]
 # CMD ["bun", "run", "dist/main.js"]
