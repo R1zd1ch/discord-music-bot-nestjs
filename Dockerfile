@@ -15,10 +15,10 @@ RUN bun add @prisma/client prisma
 
 COPY prisma ./prisma
 RUN bun run prisma generate
-RUN bun run prisma db push
 
 COPY . .
 
 RUN bun run build
 
-CMD ["bun", "run", "dist/main.js"]
+CMD ["/app/start.sh"]
+# CMD ["bun", "run", "dist/main.js"]
