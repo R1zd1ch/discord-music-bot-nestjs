@@ -14,7 +14,8 @@ RUN bun install
 RUN bun add @prisma/client prisma
 
 COPY prisma ./prisma
-RUN bun run prisma generate
+RUN bunx run prisma generate
+RUN bunx run prisma db push
 
 COPY . .
 
