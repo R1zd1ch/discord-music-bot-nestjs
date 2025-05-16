@@ -10,7 +10,7 @@ export class PrismaService
     super({
       datasources: {
         db: {
-          url: process.env.DATABASE_URL!,
+          url: process.env.POSTGRES_URI!,
         },
       },
       log: ['error', 'warn'],
