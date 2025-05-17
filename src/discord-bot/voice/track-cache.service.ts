@@ -42,38 +42,49 @@ export class TrackCacheService {
     return filePath;
   }
 
-  private ensureCacheDirExists() {
-    if (!fs.existsSync(this.CACHE_DIR)) {
-      fs.mkdirSync(this.CACHE_DIR);
+  private async ensureCacheDirExists() {
+    try {
+      await fs.promises.access(this.CACHE_DIR);
+    } catch {
+      await fs.promises.mkdir(this.CACHE_DIR, { recursive: true });
     }
   }
 
   cleanupTrack(trackId) {
     const filePath = path.join(this.CACHE_DIR, `${trackId}.mp3`);
-    if (fs.existsSync(filePath)) {
-      fs.unlinkSync(filePath);
-    }
+    fs.promises.unlink(filePath).catch((err) => {
+      if (err.code !== 'ENOENT') {
+        this.logger.error(`Error removing track file: ${err.message}`);
+      }
+    });
   }
 
   private setupCleanupSchedule() {
     setInterval(() => this.cleanupOldFiles(), this.SCHEDULE_TIME);
   }
 
-  private cleanupOldFiles() {
+  private async cleanupOldFiles() {
     const now = Date.now();
 
-    fs.readdir(this.CACHE_DIR, (err, files) => {
-      files.forEach((file) => {
+    try {
+      const files = await fs.promises.readdir(this.CACHE_DIR);
+
+      for (const file of files) {
         const filePath = path.join(this.CACHE_DIR, file);
-        fs.stat(filePath, (err, stats) => {
+        try {
+          const stats = await fs.promises.stat(filePath);
           if (now - stats.mtimeMs > this.MAX_AGE) {
-            fs.unlink(filePath, (err: Error) => {
-              if (err) this.logger.error(`Cache cleanup error: ${err.message}`);
-              else this.logger.log(`Cleaned up: ${filePath}`);
-            });
+            await fs.promises.unlink(filePath);
+            this.logger.log(`Cleaned up: ${filePath}`);
           }
-        });
-      });
-    });
+        } catch (err) {
+          this.logger.error(
+            `Cache cleanup error for ${filePath}: ${err.message}`,
+          );
+        }
+      }
+    } catch (err) {
+      this.logger.error(`Cache directory read error: ${err.message}`);
+    }
   }
 }

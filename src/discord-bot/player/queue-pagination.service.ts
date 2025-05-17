@@ -1,6 +1,7 @@
-import { NecordPaginationService } from '@necord/pagination';
-import { Injectable, Logger } from '@nestjs/common';
-import { QueueItemType, Track } from '@prisma/client';
+import { CACHE_MANAGER } from '@nestjs/cache-manager';
+import { Inject, Injectable, Logger } from '@nestjs/common';
+import { QueueItem, QueueItemType, Track } from '@prisma/client';
+import { Cache } from 'cache-manager';
 import {
   ActionRowBuilder,
   ButtonBuilder,
@@ -9,6 +10,7 @@ import {
   EmbedBuilder,
 } from 'discord.js';
 import { SlashCommandContext } from 'necord';
+import { RedisKeys } from 'src/constants';
 import { QueueService } from 'src/queue/queue.service';
 
 @Injectable()
@@ -16,8 +18,8 @@ export class QueuePaginationService {
   private readonly logger = new Logger(QueuePaginationService.name);
 
   public constructor(
-    private readonly paginationService: NecordPaginationService,
     private queueService: QueueService,
+    @Inject(CACHE_MANAGER) private cacheManager: Cache,
   ) {}
 
   private async pagination(
@@ -191,7 +193,21 @@ export class QueuePaginationService {
   }
 
   private async getDataForQueueBuild(guildId: string) {
-    const data = await this.queueService.getQueue(guildId);
+    const cacheKey = RedisKeys.queuePagination(guildId);
+    const cachedData = await this.cacheManager.get<{
+      currentItem: QueueItem | null;
+      currentTrack: Track | null;
+      tracks: Track[] | null;
+    }>(cacheKey);
+    if (cachedData) {
+      this.logger.debug('Using cached pagination data');
+      return cachedData;
+    }
+
+    const data = cachedData
+      ? cachedData
+      : await this.queueService.getQueue(guildId);
+
     const currentItem = this.queueService.getCurrentItem(data);
     //eslint-disable-next-line
     const currentTrack: Track =
@@ -210,6 +226,8 @@ export class QueuePaginationService {
         ? [item.track]
         : item.playlist?.tracks.map((t) => t.track) || [],
     );
+
+    await this.cacheManager.set(cacheKey, data, 10 * 1000);
 
     return {
       currentItem,

@@ -43,6 +43,7 @@ model PlaylistTrack {
   createdAt DateTime @default(now())
 
   @@unique([playlistId, trackId])
+  @@index([playlistId, position])
 }
 
 model Track {

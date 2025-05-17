@@ -5,7 +5,7 @@ import { AudioConnectionManagerService } from '../voice/audio-connection-manager
 @Injectable()
 export class EventHandlerService {
   private readonly logger = new Logger(EventHandlerService.name);
-  private readonly TIME_TO_LEAVE_VOICE_CHANNEL = 0.5 * 60 * 1000;
+  private readonly TIME_TO_LEAVE_VOICE_CHANNEL = 3 * 60 * 1000;
   constructor(
     private readonly connectionsManager: AudioConnectionManagerService,
   ) {}

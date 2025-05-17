@@ -1,10 +1,16 @@
-import { Injectable, Logger } from '@nestjs/common';
-import { Track } from '@prisma/client';
+import { CACHE_MANAGER } from '@nestjs/cache-manager';
+import { Inject, Injectable, Logger } from '@nestjs/common';
+import { Playlist, PlaylistTrack, Track } from '@prisma/client';
+import { Cache } from 'cache-manager';
+import { RedisKeys } from 'src/constants';
 import { PrismaService } from 'src/prisma/prisma.service';
 
 @Injectable()
 export class PlaylistService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    @Inject(CACHE_MANAGER) private cacheManager: Cache,
+  ) {}
   private readonly logger = new Logger(PlaylistService.name);
 
   async createPlaylist(userId: string, name: string) {
@@ -16,7 +22,11 @@ export class PlaylistService {
   }
 
   async getPlaylists(userId: string) {
-    return this.prisma.playlist.findMany({
+    const cacheKey = RedisKeys.playlists(userId);
+    const cached = await this.cacheManager.get<Playlist[]>(cacheKey);
+    if (cached) return cached;
+
+    const playlist = await this.prisma.playlist.findMany({
       where: { userId },
       include: {
         tracks: {
@@ -25,14 +35,29 @@ export class PlaylistService {
         },
       },
     });
+
+    await this.cacheManager.set(cacheKey, playlist, 30 * 60 * 1000);
+    return playlist;
   }
 
   async getTracksFromPlaylist(playlistId: string) {
-    return this.prisma.playlistTrack.findMany({
+    const cacheKey = RedisKeys.playlistTracks(playlistId);
+    const cached = await this.cacheManager.get<
+      (PlaylistTrack & {
+        track: Track;
+      })[]
+    >(cacheKey);
+
+    if (cached) return cached;
+
+    const tracks = await this.prisma.playlistTrack.findMany({
       where: { playlistId },
       include: { track: true },
       orderBy: { position: 'asc' },
     });
+    await this.cacheManager.set(cacheKey, tracks, 30 * 60 * 1000);
+
+    return tracks;
   }
 
   async addTrackToPlaylist(playlistId: string, trackId: string) {
@@ -42,16 +67,20 @@ export class PlaylistService {
 
     if (existing) return existing;
 
-    const count = await this.prisma.playlistTrack.count({
-      where: { playlistId },
-    });
+    // Сначала сдвигаем все существующие треки вниз на одну позицию
+    await this.prisma.$executeRaw`
+    UPDATE "PlaylistTrack"
+    SET position = position + 1
+    WHERE "playlistId" = ${playlistId}
+  `;
 
+    // Добавляем новый трек в начало (позиция 0)
     return this.prisma.playlistTrack.create({
       data: {
         playlistId,
         trackId,
-        position: count,
-        originalPosition: count,
+        position: 0,
+        originalPosition: 0,
       },
       include: { track: true },
     });
@@ -59,6 +88,9 @@ export class PlaylistService {
 
   async addTracksToPlaylist(playlistId: string, tracks: Track[]) {
     this.logger.debug('Adding tracks to playlist');
+
+    const cacheKey = RedisKeys.playlistTracks(playlistId);
+    await this.cacheManager.del(cacheKey);
 
     const needsRestore = await this.checkPlaylistOrder(playlistId);
     if (needsRestore) await this.restorePlaylistOrder(playlistId);
@@ -80,11 +112,13 @@ export class PlaylistService {
 
       // Add new tracks
       if (newTracks.length > 0) {
+        // Сначала сдвигаем все существующие треки вниз
         await prisma.$executeRaw`
-        UPDATE "PlaylistTrack"
-        SET position = position + ${newTracks.length}
-        WHERE "playlistId" = ${playlistId}`;
+      UPDATE "PlaylistTrack"
+      SET position = position + ${newTracks.length}
+      WHERE "playlistId" = ${playlistId}`;
 
+        // Добавляем новые треки в начало (позиции 0, 1, 2, ...)
         await prisma.playlistTrack.createMany({
           data: newTracks.map((t, i) => ({
             playlistId,

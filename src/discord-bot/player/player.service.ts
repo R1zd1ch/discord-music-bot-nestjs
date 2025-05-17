@@ -112,12 +112,12 @@ export class PlayerService {
   }
 
   private getNextTrack(items: QueueItem[], currentIndex: number = 0) {
-    this.logger.debug('getting next track');
     if (items.length === 0) return null;
-    this.logger.debug('not null');
 
     const firstItem = items[currentIndex];
     const nextItem = items[currentIndex + 1] ?? null;
+
+    if (!firstItem) return null;
 
     if (firstItem.type === QueueItemType.PLAYLIST) {
       const currentIndex = firstItem.currentIndex ?? 0;

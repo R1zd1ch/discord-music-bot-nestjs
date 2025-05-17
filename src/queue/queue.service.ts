@@ -1,17 +1,21 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { CACHE_MANAGER } from '@nestjs/cache-manager';
+import { Inject, Injectable, Logger } from '@nestjs/common';
 import { LoopMode, QueueItem, QueueItemType } from '@prisma/client';
+import { Cache } from 'cache-manager';
+import { RedisKeys } from 'src/constants';
 import { PrismaService } from 'src/prisma/prisma.service';
 
 @Injectable()
 export class QueueService {
   private readonly logger = new Logger(QueueService.name);
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    @Inject(CACHE_MANAGER) private cacheManager: Cache,
+  ) {}
 
   async getQueue(guildId: string) {
-    const queue = this.prisma.queue.findUnique({
-      where: {
-        guildId,
-      },
+    const queue = await this.prisma.queue.findUnique({
+      where: { guildId },
       include: {
         items: {
           orderBy: { position: 'asc' },
@@ -20,9 +24,7 @@ export class QueueService {
             playlist: {
               include: {
                 tracks: {
-                  include: {
-                    track: true,
-                  },
+                  include: { track: true },
                   orderBy: { position: 'asc' },
                 },
               },
@@ -38,14 +40,10 @@ export class QueueService {
   async getPlaylistsFromQueue(guildId: string) {
     const queuePlaylists = await this.prisma.queueItem.findMany({
       where: {
-        queue: {
-          guildId,
-        },
+        queue: { guildId },
         type: QueueItemType.PLAYLIST,
       },
-      select: {
-        playlist: true,
-      },
+      select: { playlist: true },
     });
 
     if (!queuePlaylists || queuePlaylists.length === 0) return [];
@@ -54,21 +52,42 @@ export class QueueService {
   }
 
   async shuffleQueue(guildId: string) {
+    this.logger.debug('Shuffling queue');
+    const queuePaginationKey = RedisKeys.queuePagination(guildId);
+    await this.cacheManager.del(queuePaginationKey);
     const queue = await this.prisma.queue.findUnique({
-      where: {
-        guildId,
-      },
-      include: {
-        items: {
-          orderBy: { position: 'asc' },
-        },
-      },
+      where: { guildId },
+      include: { items: { orderBy: { position: 'asc' } } },
     });
+
+    if (
+      queue &&
+      queue.items.length === 1 &&
+      queue.items[0].type === QueueItemType.PLAYLIST
+    ) {
+      const playlistTraksCacheKey = RedisKeys.playlistTracks(
+        queue.items[0].playlistId as string,
+      );
+      await this.cacheManager.del(playlistTraksCacheKey);
+    }
 
     if (!queue || queue.items.length < 2) return;
 
     const currentItem = this.getCurrentItem(queue);
+
     if (!currentItem) return;
+    const playlistIds = queue.items
+      .filter((item) => item.type === QueueItemType.PLAYLIST)
+      .map((item) => item.playlistId);
+
+    await Promise.all(
+      playlistIds.map(async (item) => {
+        if (!item) return;
+        const playlistTraksCacheKey = RedisKeys.playlistTracks(item);
+        await this.cacheManager.del(playlistTraksCacheKey);
+        void item;
+      }),
+    );
 
     const itemsToShuffle = queue.items.filter(
       (item) => item.id !== currentItem.id,
@@ -103,14 +122,8 @@ export class QueueService {
 
   async restoreQueueOrder(guildId: string) {
     const queue = await this.prisma.queue.findUnique({
-      where: {
-        guildId,
-      },
-      include: {
-        items: {
-          orderBy: { originalPosition: 'asc' },
-        },
-      },
+      where: { guildId },
+      include: { items: { orderBy: { originalPosition: 'asc' } } },
     });
 
     if (!queue) return;
@@ -141,25 +154,14 @@ export class QueueService {
 
   async addTracksToQueue(guildId: string, trackIds: string[]) {
     let queue = await this.prisma.queue.findFirst({
-      where: {
-        guildId,
-      },
+      where: { guildId },
     });
 
     if (!queue) {
       queue = await this.prisma.queue.create({
-        data: {
-          guildId,
-        },
+        data: { guildId },
       });
     }
-
-    // const currentPosition =
-    //   (await this.prisma.queueItem.count({
-    //     where: {
-    //       queueId: queue.id,
-    //     },
-    //   })) + 1;
 
     const queueItems = trackIds.map((trackId, index) => ({
       queueId: queue.id,
@@ -169,26 +171,18 @@ export class QueueService {
       originalPosition: -1,
     }));
 
-    return this.prisma.queueItem.createMany({
-      data: queueItems,
-    });
+    return this.prisma.queueItem.createMany({ data: queueItems });
   }
 
   async addPlaylistToQueue(guildId: string, playlistId: string) {
     let queue = await this.prisma.queue.findFirst({
-      where: {
-        guildId,
-      },
+      where: { guildId },
     });
 
-    if (!queue) {
-      queue = await this.prisma.queue.create({ data: { guildId } });
-    }
+    if (!queue) queue = await this.prisma.queue.create({ data: { guildId } });
 
     const position = await this.prisma.queueItem.count({
-      where: {
-        queueId: queue.id,
-      },
+      where: { queueId: queue.id },
     });
 
     const response = await this.prisma.queueItem.create({
@@ -256,12 +250,8 @@ export class QueueService {
     if (queue.currentPosition < queue.items.length - 1) {
       this.logger.debug(`skiping element`);
       await this.prisma.queue.update({
-        where: {
-          guildId,
-        },
-        data: {
-          currentPosition: queue.currentPosition + 1,
-        },
+        where: { guildId },
+        data: { currentPosition: queue.currentPosition + 1 },
       });
     }
 
@@ -282,7 +272,6 @@ export class QueueService {
     //eslint-disable-next-line
     if (currentItem?.type === QueueItemType.PLAYLIST) {
       if ((currentItem.currentIndex ?? 0) > 0) {
-        // Возврат внутри плейлиста
         await this.prisma.queueItem.update({
           where: { id: currentItem.id },
           data: { currentIndex: { decrement: 1 } },
@@ -304,9 +293,7 @@ export class QueueService {
 
   async setVolume(guildId: string, volume: number) {
     return this.prisma.queue.update({
-      where: {
-        guildId,
-      },
+      where: { guildId },
       data: { volume: Math.min(Math.max(volume, 0), 200) },
     });
   }
@@ -314,9 +301,7 @@ export class QueueService {
   async getVolume(guildId: string) {
     const queue = await this.prisma.queue.findFirst({
       where: { guildId },
-      select: {
-        volume: true,
-      },
+      select: { volume: true },
     });
 
     return queue?.volume ?? 100;
@@ -324,35 +309,35 @@ export class QueueService {
 
   async updatePlayerMessageId(guildId: string, messageId: string) {
     return this.prisma.queue.update({
-      where: {
-        guildId,
-      },
-      data: {
-        playerMessageId: messageId,
-      },
+      where: { guildId },
+      data: { playerMessageId: messageId },
     });
   }
 
   async getPlayerMessageId(guildId: string) {
+    const cachedKey = RedisKeys.playerMessageId(guildId);
+    const cachedMessageId = await this.cacheManager.get<string>(cachedKey);
+    this.logger.debug('cachedMessageId', cachedMessageId);
+
+    if (cachedMessageId) {
+      this.logger.debug('Cache hit messageID');
+      return cachedMessageId;
+    }
     const queue = await this.prisma.queue.findFirst({
-      where: {
-        guildId,
-      },
-      select: {
-        playerMessageId: true,
-      },
+      where: { guildId },
+      select: { playerMessageId: true },
     });
+
+    if (queue) {
+      await this.cacheManager.set(cachedKey, queue.playerMessageId);
+    }
     return queue?.playerMessageId;
   }
 
   async setLoopMode(guildId: string) {
     const queue = await this.prisma.queue.findFirst({
-      where: {
-        guildId,
-      },
-      select: {
-        loopMode: true,
-      },
+      where: { guildId },
+      select: { loopMode: true },
     });
 
     const loopMode = queue?.loopMode;
@@ -363,53 +348,30 @@ export class QueueService {
       loopMode === LoopMode.NONE ? LoopMode.TRACK : LoopMode.NONE;
 
     await this.prisma.queue.update({
-      where: {
-        guildId,
-      },
-      data: {
-        loopMode: updatedLoopMode,
-      },
+      where: { guildId },
+      data: { loopMode: updatedLoopMode },
     });
     return updatedLoopMode;
   }
 
   async clearQueue(guildId: string) {
-    const queue = await this.prisma.queue.findFirst({
-      where: {
-        guildId,
-      },
-    });
-
+    const queue = await this.prisma.queue.findFirst({ where: { guildId } });
     if (!queue) return;
 
     return this.prisma.queueItem
-      .deleteMany({
-        where: {
-          queueId: queue.id,
-        },
-      })
-      .then(() =>
-        this.prisma.queue.delete({
-          where: {
-            id: queue.id,
-          },
-        }),
-      );
+      .deleteMany({ where: { queueId: queue.id } })
+      .then(() => this.prisma.queue.delete({ where: { id: queue.id } }));
   }
 
   async removeItemFromQueue(itemId: string) {
     const queueItem = await this.prisma.queueItem.findFirst({
-      where: {
-        id: itemId,
-      },
+      where: { id: itemId },
     });
 
     if (!queueItem) return null;
 
     return this.prisma.queueItem.delete({
-      where: {
-        id: queueItem.id,
-      },
+      where: { id: queueItem.id },
     });
   }
 

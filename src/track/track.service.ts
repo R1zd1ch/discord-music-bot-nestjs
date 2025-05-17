@@ -1,10 +1,17 @@
-import { Injectable } from '@nestjs/common';
+import { Inject, Injectable } from '@nestjs/common';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { CreateTrackDto } from './dtos/create-track.dto';
+import { RedisKeys } from 'src/constants';
+import { CACHE_MANAGER } from '@nestjs/cache-manager';
+import { Cache } from 'cache-manager';
+import { Track } from '@prisma/client';
 
 @Injectable()
 export class TrackService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    @Inject(CACHE_MANAGER) private cacheManager: Cache,
+  ) {}
 
   async createTrack(trackDto: CreateTrackDto) {
     const track = await this.prisma.track.findFirst({
@@ -23,11 +30,18 @@ export class TrackService {
   }
 
   async getTrack(trackId: string) {
+    const cacheKey = RedisKeys.track(trackId);
+
+    const cachedTrack = await this.cacheManager.get<Track>(cacheKey);
+    if (cachedTrack) return cachedTrack;
+
     const track = await this.prisma.track.findUnique({
       where: {
         trackId,
       },
     });
+
+    await this.cacheManager.set(cacheKey, track, 60 * 60 * 24);
 
     if (!track) return null;
 

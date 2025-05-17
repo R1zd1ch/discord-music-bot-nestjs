@@ -1,9 +1,12 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Inject, Injectable, Logger } from '@nestjs/common';
 import { YandexMusicClient } from 'yandex-music-client';
 import { getTrackUrl } from 'yandex-music-client/trackUrl';
 import { TrackService } from 'src/track/track.service';
 import { CreateTrackDto } from 'src/track/dtos/create-track.dto';
 import { Track } from '@prisma/client';
+import { RedisKeys } from 'src/constants';
+import { CACHE_MANAGER } from '@nestjs/cache-manager';
+import { Cache } from 'cache-manager';
 
 @Injectable()
 export class YandexMusicService {
@@ -11,26 +14,48 @@ export class YandexMusicService {
   constructor(
     private readonly yandexMusicClient: YandexMusicClient,
     private readonly tracksService: TrackService,
+    @Inject(CACHE_MANAGER) private cacheManager: Cache,
   ) {}
 
   async searchYM(query: string) {
     if (!query) return { tracks: [] };
 
+    const cacheKey = RedisKeys.searchResult(query);
+    const cachedResult = await this.cacheManager.get<{
+      tracks: Track[];
+      playlistName?: string;
+    }>(cacheKey);
+    if (cachedResult) {
+      this.logger.debug('Returned cached result');
+      return cachedResult;
+    }
+
     this.logger.log(`Received search query: ${query}`);
+
+    let result: {
+      tracks: Track[];
+      playlistName?: string;
+    };
 
     switch (true) {
       case query.includes('users/') && query.includes('playlists/'):
-        return this.getTracksFromPlaylistYM(query);
+        result = await this.getTracksFromPlaylistYM(query);
+        break;
 
       case query.includes('album/') && query.includes('track/'):
-        return this.getTrackByIdYM(query);
+        result = await this.getTrackByIdYM(query);
+        break;
 
       case query.includes('album/'):
-        return this.getTracksFromAlbumYM(query);
-
+        result = await this.getTracksFromAlbumYM(query);
+        break;
       default:
-        return this.getTrackByName(query);
+        result = await this.getTrackByName(query);
+        break;
     }
+
+    await this.cacheManager.set(cacheKey, result, 60 * 60 * 1000);
+    return result;
   }
 
   async getTrackByName(query: string) {
