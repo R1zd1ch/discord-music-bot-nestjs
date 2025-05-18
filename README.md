@@ -158,4 +158,4 @@ bun run dist/main.js
 
 ## Автор
 
-R1zdd
+R1zd1ch
